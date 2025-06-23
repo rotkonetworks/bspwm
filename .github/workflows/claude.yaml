@@ -1,0 +1,35 @@
+name: Assistant
+on:
+ issue_comment:
+   types: [created]
+ pull_request_review_comment:
+   types: [created]
+ issues:
+   types: [opened, assigned]
+ pull_request_review:
+   types: [submitted]
+ pull_request:
+   types: [opened, synchronize]
+jobs:
+ claude-response:
+   runs-on: ubuntu-latest
+   if: |
+     (github.event_name == 'issue_comment' && contains(fromJSON('["member", "owner"]'), github.event.comment.author_association)) ||
+     (github.event_name == 'pull_request_review_comment' && contains(fromJSON('["member", "owner"]'), github.event.comment.author_association)) ||
+     (github.event_name == 'pull_request_review' && contains(fromJSON('["member", "owner"]'), github.event.review.author_association)) ||
+     (github.event_name == 'issues' && contains(fromJSON('["member", "owner"]'), github.event.issue.author_association)) ||
+     (github.event_name == 'pull_request' && contains(fromJSON('["member", "owner"]'), github.event.pull_request.author_association))
+   permissions:
+    id-token: write
+    contents: write
+    issues: write
+    pull-requests: write
+   steps:
+     - uses: actions/checkout@v4
+       with:
+         fetch-depth: -1
+     - uses: anthropics/claude-code-action@beta
+       with:
+         anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+         trigger_phrase: "/claude"
+         timeout_minutes: 30
