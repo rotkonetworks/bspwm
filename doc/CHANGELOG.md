@@ -1,23 +1,37 @@
-# From 0.10.1 to 0.10.2
+# From 0.10.2 to 0.10.3
+* **src/events.c**
 
-- Fix buffer overflow vulnerability in `make_monitor()` using `strncpy` with explicit null termination.
-- Fix integer overflow vulnerabilities in `monitor_from_client()` when calculating center coordinates.
-- Fix integer overflow vulnerabilities in `adapt_geometry()` using safe arithmetic macros for all coordinate calculations.
-- Fix potential stack overflow from VLA in `update_monitors()` by validating monitor count against `MAX_MONITORS` limit.
-- Fix integer overflow in `embrace_client()` when adjusting window positions to fit monitor bounds.
-- Fix memory leak in `update_monitors()` by ensuring all allocated structures are properly freed.
-- Fix null pointer dereferences throughout monitor operations with consistent validation.
-- Fix unsafe `copy_string()` usage in `update_monitors()` by using stack allocation with bounds checking.
-- Add `SAFE_ADD()` and `SAFE_SUB()` macros to prevent integer overflow in arithmetic operations.
-- Add `batch_ewmh_update()` helper to reduce X11 round trips when updating EWMH properties.
-- Add null checks in `is_inside_monitor()`, `rename_monitor()`, and all monitor finding functions.
-- Add proper bounds validation for monitor names to prevent buffer overflows.
-- Optimize `monitor_from_client()` distance calculation using unsigned arithmetic without `abs()`.
-- Optimize monitor list operations by simplifying control flow and removing redundant conditions.
-- Optimize `update_monitors()` to use fixed-size cookie array instead of VLA.
-- Use `int64_t` for intermediate calculations in `adapt_geometry()` to prevent overflow.
-- Ensure minimum window dimensions of 1x1 in `adapt_geometry()` to prevent invalid rectangles.
-- Validate rectangle dimensions before performing scaling calculations in window positioning.
+  * Introduce `handlers[256]` array and `init_handlers()` to replace giant `switch` with table-driven dispatch
+  * Add null checks for event pointers in all handlers
+  * Consolidate `configure_request` mask/value setup via `ADD_VALUE` macro
+  * Safely adjust window border offsets with bounds checks
+  * Guard all accesses to `loc.monitor`, `loc.desktop`, `loc.node` before use
+* **src/jsmn.c**
+
+  * Define `JSMN_MAX_DEPTH` and enforce parser depth limit
+  * Add null-pointer validation for `parser`, `js`, `tokens` in all parse routines
+  * Refactor `jsmn_parse_*` to return clear error codes on invalid input or out-of-memory
+* **src/parse.c**
+
+  * Replace repetitive `parse_*` `if`/`else` chains with sorted lookup tables + `BINARY_SEARCH_PARSER` macros
+  * Optimize `parse_bool`, `parse_degree`, `parse_rectangle`, `parse_id`, `parse_button_index` for speed and safety
+  * Add descriptor-length checks and null guards in `*_from_desc()` functions
+  * Consolidate modifier parsing via `PARSE_MODIFIER` macro
+* **src/pointer.c**
+
+  * Add `window_exists()` guards before grabbing/ungrabbing buttons
+  * Simplify `window_grab_button()` by iterating lock-mask bits instead of eight manual calls
+  * Null-check keysyms, modifier mapping replies, and allocate errors
+* **src/query.c**
+
+  * Introduce `MAX_RECURSION_DEPTH` and depth checks in all recursive `query_*` functions
+  * Add `if (!rsp) return;` guards to avoid NULL `FILE*` derefs
+  * Validate all `mon`, `loc`, `dst` structures before field access
+* **src/stack.c**
+
+  * Define `MAX_STACK_DEPTH` and prevent infinite recursion in `restack_presel_feedbacks_in_depth()`
+  * Null-check inputs in stack creation/insertion/removal routines
+  * Simplify `remove_stack_node()` loop to avoid nested breaks and memory errors
 
 # From 0.10.0 to 0.10.1
 
