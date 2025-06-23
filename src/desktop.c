@@ -347,6 +347,7 @@ void remove_desktop(monitor_t *m, desktop_t *d)
 	ewmh_update_desktop_names();
 	ewmh_update_desktop_viewport();
 
+	if (m == NULL) return;
 	if (mon != NULL && m->desk == NULL) {
 		if (m == mon) {
 			focus_node(m, NULL, NULL);
