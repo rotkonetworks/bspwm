@@ -80,31 +80,36 @@ void remove_rule(rule_t *r)
 
 void remove_rule_by_cause(char *cause)
 {
-	rule_t *r = rule_head;
-	struct tokenize_state state;
-	char *class_name = tokenize_with_escape(&state, cause, COL_TOK[0]);
-	char *instance_name = tokenize_with_escape(&state, NULL, COL_TOK[0]);
-	char *name = tokenize_with_escape(&state, NULL, COL_TOK[0]);
-	if (!class_name || !instance_name || !name) {
-		free(class_name);
-		free(instance_name);
-		free(name);
-		return;
-	}
+    if (cause == NULL || strlen(cause) >= MAXLEN * 3) {
+        return;
+    }
 
-	while (r != NULL) {
-		rule_t *next = r->next;
-		if ((class_name != NULL && (streq(class_name, MATCH_ANY) || streq(r->class_name, class_name))) &&
-		    (instance_name == NULL || streq(instance_name, MATCH_ANY) || streq(r->instance_name, instance_name)) &&
-		    (name == NULL || streq(name, MATCH_ANY) || streq(r->name, name))) {
-			remove_rule(r);
-		}
-		r = next;
-	}
-	free(class_name);
-	free(instance_name);
-	free(name);
-}
+    rule_t *r = rule_head;
+    struct tokenize_state state;
+    char *class_name = tokenize_with_escape(&state, cause, COL_TOK[0]);
+    char *instance_name = tokenize_with_escape(&state, NULL, COL_TOK[0]);
+    char *name = tokenize_with_escape(&state, NULL, COL_TOK[0]);
+
+    if (class_name && strlen(class_name) >= MAXLEN) {
+        free(class_name);
+        class_name = NULL;
+    }
+    if (instance_name && strlen(instance_name) >= MAXLEN) {
+        free(instance_name);
+        instance_name = NULL;
+    }
+    if (name && strlen(name) >= MAXLEN) {
+        free(name);
+        name = NULL;
+    }
+
+    if (!class_name || !instance_name || !name) {
+        free(class_name);
+        free(instance_name);
+        free(name);
+        return;
+    }
+
 
 bool remove_rule_by_index(int idx)
 {
@@ -314,14 +319,30 @@ void _apply_name(xcb_window_t win, rule_consequence_t *csq)
 
 void parse_keys_values(char *buf, rule_consequence_t *csq)
 {
-	char *key = strtok(buf, CSQ_BLK);
-	char *value = strtok(NULL, CSQ_BLK);
-	while (key != NULL && value != NULL) {
-		parse_key_value(key, value, csq);
-		key = strtok(NULL, CSQ_BLK);
-		value = strtok(NULL, CSQ_BLK);
-	}
+    if (buf == NULL || strlen(buf) >= BUFSIZ) {
+        return;
+    }
+
+    char *buf_copy = malloc(strlen(buf) + 1);
+    if (buf_copy == NULL) {
+        return;
+    }
+    strcpy(buf_copy, buf);
+
+    char *key = strtok(buf_copy, CSQ_BLK);
+    char *value = strtok(NULL, CSQ_BLK);
+
+    while (key != NULL && value != NULL) {
+        if (strlen(key) < MAXLEN && strlen(value) < MAXLEN) {
+            parse_key_value(key, value, csq);
+        }
+        key = strtok(NULL, CSQ_BLK);
+        value = strtok(NULL, CSQ_BLK);
+    }
+
+    free(buf_copy);
 }
+
 
 void apply_rules(xcb_window_t win, rule_consequence_t *csq)
 {
@@ -385,16 +406,24 @@ bool schedule_rules(xcb_window_t win, rule_consequence_t *csq)
 
 void parse_rule_consequence(int fd, rule_consequence_t *csq)
 {
-	if (fd == -1) {
-		return;
-	}
-	char data[BUFSIZ];
-	int nb;
-	while ((nb = read(fd, data, sizeof(data))) > 0) {
-		int end = MIN(nb, (int) sizeof(data) - 1);
-		data[end] = '\0';
-		parse_keys_values(data, csq);
-	}
+    if (fd == -1) {
+        return;
+    }
+    char data[BUFSIZ];
+    int nb;
+    int total_read = 0;
+
+    while ((nb = read(fd, data + total_read, sizeof(data) - total_read - 1)) > 0) {
+        total_read += nb;
+        if (total_read >= sizeof(data) - 1) {
+            break;
+        }
+    }
+
+    if (total_read > 0) {
+        data[total_read] = '\0';
+        parse_keys_values(data, csq);
+    }
 }
 
 void parse_key_value(char *key, char *value, rule_consequence_t *csq)

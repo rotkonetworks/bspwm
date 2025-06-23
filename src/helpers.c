@@ -53,70 +53,115 @@ void err(char *fmt, ...)
 
 char *read_string(const char *file_path, size_t *tlen)
 {
-	if (file_path == NULL) {
-		return NULL;
-	}
+    if (file_path == NULL) {
+        return NULL;
+    }
 
-	int fd = open(file_path, O_RDONLY);
+    int fd = open(file_path, O_RDONLY);
+    if (fd == -1) {
+        perror("Read file: open");
+        return NULL;
+    }
 
-	if (fd == -1) {
-		perror("Read file: open");
-		return NULL;
-	}
+    struct stat st;
+    if (fstat(fd, &st) == -1) {
+        perror("Read file: fstat");
+        close(fd);
+        return NULL;
+    }
 
-	char buf[BUFSIZ], *content = NULL;
-	size_t len = sizeof(buf);
+    if (st.st_size > MAX_STRING_SIZE) {
+        warn("File too large: %lld bytes (max: %d)\n", (long long)st.st_size, MAX_STRING_SIZE);
+        close(fd);
+        return NULL;
+    }
 
-	if ((content = calloc(len, sizeof(char))) == NULL) {
-		perror("Read file: calloc");
-		goto end;
-	}
+    char buf[BUFSIZ], *content = NULL;
+    size_t len = sizeof(buf);
 
-	int nb;
-	*tlen = 0;
+    if ((content = calloc(len, sizeof(char))) == NULL) {
+        perror("Read file: calloc");
+        close(fd);
+        return NULL;
+    }
 
-	while (true) {
-		nb = read(fd, buf, sizeof(buf));
-		if (nb < 0) {
-			perror("Restore tree: read");
-			free(content);
-			content = NULL;
-			goto end;
-		} else if (nb == 0) {
-			break;
-		} else {
-			*tlen += nb;
-			if (*tlen > len) {
-				len *= 2;
-				char *rcontent = realloc(content, len * sizeof(char));
-				if (rcontent == NULL) {
-					perror("Read file: realloc");
-					free(content);
-					content = NULL;
-					goto end;
-				} else {
-					content = rcontent;
-				}
-			}
-			strncpy(content + (*tlen - nb), buf, nb);
-		}
-	}
+    int nb;
+    *tlen = 0;
 
-end:
-	close(fd);
-	return content;
+    while (true) {
+        nb = read(fd, buf, sizeof(buf));
+        if (nb < 0) {
+            perror("Read file: read");
+            free(content);
+            close(fd);
+            return NULL;
+        } else if (nb == 0) {
+            break;
+        } else {
+            *tlen += nb;
+
+            if (*tlen > MAX_STRING_SIZE) {
+                warn("Content too large while reading\n");
+                free(content);
+                close(fd);
+                return NULL;
+            }
+
+            if (*tlen > len) {
+                len *= 2;
+                if (len > MAX_STRING_SIZE) {
+                    len = MAX_STRING_SIZE + 1;
+                }
+                char *rcontent = realloc(content, len * sizeof(char));
+                if (rcontent == NULL) {
+                    perror("Read file: realloc");
+                    free(content);
+                    close(fd);
+                    return NULL;
+                } else {
+                    content = rcontent;
+                }
+            }
+            memcpy(content + (*tlen - nb), buf, nb);
+        }
+    }
+
+    close(fd);
+
+    if (*tlen < len) {
+        content[*tlen] = '\0';
+    }
+
+    return content;
 }
+
 
 char *copy_string(char *str, size_t len)
 {
-	char *cpy = calloc(1, ((len+1) * sizeof(char)));
-	if (cpy == NULL) {
-		perror("Copy string: calloc");
-		return NULL;
-	}
-	strncpy(cpy, str, len);
-	cpy[len] = '\0';
-	return cpy;
+    if (str == NULL || len == 0) {
+        return NULL;
+    }
+
+    if (len > MAX_STRING_SIZE) {
+        warn("String too large: %zu bytes (max: %d)\n", len, MAX_STRING_SIZE);
+        return NULL;
+    }
+
+    if (len + 1 < len) {
+        warn("Integer overflow in string allocation\n");
+        return NULL;
+    }
+
+    char *cpy = calloc(1, len + 1);
+    if (cpy == NULL) {
+        perror("Copy string: calloc");
+        return NULL;
+    }
+
+    memcpy(cpy, str, len);
+    cpy[len] = '\0';
+
+    return cpy;
 }
 
 char *mktempfifo(const char *template)
@@ -195,36 +240,48 @@ bool is_hex_color(const char *color)
 
 char *tokenize_with_escape(struct tokenize_state *state, const char *s, char sep)
 {
-	if (s != NULL) {
-		// first call
-		state->in_escape = false;
-		state->pos = s;
-		state->len = strlen(s) + 1;
-	}
+    if (s != NULL) {
+        // first call
+        state->in_escape = false;
+        state->pos = s;
+        state->len = strlen(s) + 1;
 
-	char *outp = calloc(state->len, 1);
-	char *ret = outp;
-	if (!outp) return NULL;
+        if (state->len > MAX_STRING_SIZE) {
+            return NULL;
+        }
+    }
 
-	char cur;
-	while (*state->pos) {
-		--state->len;
-		cur = *state->pos++;
+    if (state->len > MAX_STRING_SIZE) {
+        return NULL;
+    }
 
-		if (state->in_escape) {
-			*outp++ = cur;
-			state->in_escape = false;
-			continue;
-		}
+    char *outp = calloc(state->len, 1);
+    if (!outp) return NULL;
 
-		if (cur == '\\') {
-			state->in_escape = !state->in_escape;
-		} else if (cur == sep) {
-			return ret;
-		} else {
-			*outp++ = cur;
-		}
-	}
+    char *ret = outp;
+    char cur;
+    size_t out_len = 0;
 
-	return ret;
+    while (*state->pos && out_len < state->len - 1) {
+        --state->len;
+        cur = *state->pos++;
+
+        if (state->in_escape) {
+            *outp++ = cur;
+            out_len++;
+            state->in_escape = false;
+            continue;
+        }
+
+        if (cur == '\\') {
+            state->in_escape = !state->in_escape;
+        } else if (cur == sep) {
+            return ret;
+        } else {
+            *outp++ = cur;
+            out_len++;
+        }
+    }
+
+    return ret;
 }

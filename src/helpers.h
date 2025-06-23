@@ -72,6 +72,8 @@
 #define MAXLEN    256
 #define SMALEN     32
 #define INIT_CAP    8
+#define MAX_STRING_SIZE (1024 * 1024)
+
 
 #define cleaned_mask(m)   (m & ~(num_lock | scroll_lock | caps_lock))
 #define streq(s1, s2)     (strcmp((s1), (s2)) == 0)
