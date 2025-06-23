@@ -33,6 +33,10 @@
 
 #define MISSING_VALUE        "N/A"
 #define MAX_WM_STATES        4
+#define MAX_CLASS_NAME_LEN   256
+#define MAX_INSTANCE_NAME_LEN 256
+#define MAX_RULE_EFFECT_LEN  1024
+
 
 typedef enum {
 	TYPE_HORIZONTAL,
@@ -220,8 +224,8 @@ struct icccm_props_t {
 };
 
 typedef struct {
-	char class_name[MAXLEN];
-	char instance_name[MAXLEN];
+	char class_name[MAX_CLASS_NAME_LEN];
+	char instance_name[MAX_INSTANCE_NAME_LEN];
 	char name[MAXLEN];
 	unsigned int border_width;
 	bool urgent;
@@ -237,6 +241,7 @@ typedef struct {
 	icccm_props_t icccm_props;
 	wm_flags_t wm_flags;
 } client_t;
+
 
 typedef struct presel_t presel_t;
 struct presel_t {
