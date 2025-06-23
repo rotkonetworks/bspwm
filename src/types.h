@@ -297,6 +297,7 @@ struct desktop_t {
 	padding_t padding;
 	int window_gap;
 	unsigned int border_width;
+	unsigned int urgent_count;
 };
 
 typedef struct monitor_t monitor_t;

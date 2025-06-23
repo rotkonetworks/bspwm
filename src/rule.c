@@ -429,7 +429,8 @@ void parse_rule_consequence(int fd, rule_consequence_t *csq)
 
     while ((nb = read(fd, data + total_read, sizeof(data) - total_read - 1)) > 0) {
         total_read += nb;
-        if (total_read >= sizeof(data) - 1) {
+        if ((size_t)total_read >= sizeof(data) - 1) {
+
             break;
         }
     }
