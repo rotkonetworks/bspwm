@@ -30,9 +30,17 @@
 #include "tree.h"
 #include "stack.h"
 
+#define MAX_STACK_DEPTH 1000
+
 stacking_list_t *make_stack(node_t *n)
 {
+	if (!n)
+		return NULL;
+
 	stacking_list_t *s = calloc(1, sizeof(stacking_list_t));
+	if (!s)
+		return NULL;
+
 	s->node = n;
 	s->prev = s->next = NULL;
 	return s;
@@ -40,8 +48,14 @@ stacking_list_t *make_stack(node_t *n)
 
 void stack_insert_after(stacking_list_t *a, node_t *n)
 {
+	if (!n)
+		return;
+
 	stacking_list_t *s = make_stack(n);
-	if (a == NULL) {
+	if (!s)
+		return;
+
+	if (!a) {
 		stack_head = stack_tail = s;
 	} else {
 		if (a->node == n) {
@@ -50,22 +64,26 @@ void stack_insert_after(stacking_list_t *a, node_t *n)
 		}
 		remove_stack_node(n);
 		stacking_list_t *b = a->next;
-		if (b != NULL) {
+		if (b)
 			b->prev = s;
-		}
 		s->next = b;
 		s->prev = a;
 		a->next = s;
-		if (stack_tail == a) {
+		if (stack_tail == a)
 			stack_tail = s;
-		}
 	}
 }
 
 void stack_insert_before(stacking_list_t *a, node_t *n)
 {
+	if (!n)
+		return;
+
 	stacking_list_t *s = make_stack(n);
-	if (a == NULL) {
+	if (!s)
+		return;
+
+	if (!a) {
 		stack_head = stack_tail = s;
 	} else {
 		if (a->node == n) {
@@ -74,54 +92,60 @@ void stack_insert_before(stacking_list_t *a, node_t *n)
 		}
 		remove_stack_node(n);
 		stacking_list_t *b = a->prev;
-		if (b != NULL) {
+		if (b)
 			b->next = s;
-		}
 		s->prev = b;
 		s->next = a;
 		a->prev = s;
-		if (stack_head == a) {
+		if (stack_head == a)
 			stack_head = s;
-		}
 	}
 }
 
 void remove_stack(stacking_list_t *s)
 {
-	if (s == NULL) {
+	if (!s)
 		return;
-	}
+
 	stacking_list_t *a = s->prev;
 	stacking_list_t *b = s->next;
-	if (a != NULL) {
+
+	if (a)
 		a->next = b;
-	}
-	if (b != NULL) {
+	if (b)
 		b->prev = a;
-	}
-	if (s == stack_head) {
+	if (s == stack_head)
 		stack_head = b;
-	}
-	if (s == stack_tail) {
+	if (s == stack_tail)
 		stack_tail = a;
-	}
+
 	free(s);
 }
 
 void remove_stack_node(node_t *n)
 {
-	for (node_t *f = first_extrema(n); f != NULL; f = next_leaf(f, n)) {
-		for (stacking_list_t *s = stack_head; s != NULL; s = s->next) {
+	if (!n)
+		return;
+
+	for (node_t *f = first_extrema(n); f; f = next_leaf(f, n)) {
+		stacking_list_t *s = stack_head;
+		stacking_list_t *next;
+		while (s) {
+			next = s->next;
 			if (s->node == f) {
 				remove_stack(s);
 				break;
 			}
+			s = next;
 		}
 	}
 }
 
 int stack_level(client_t *c)
 {
+	if (!c)
+		return 0;
+
 	int layer_level = (c->layer == LAYER_NORMAL ? 1 : (c->layer == LAYER_BELOW ? 0 : 2));
 	int state_level = (IS_TILED(c) ? 0 : (IS_FLOATING(c) ? 1 : 2));
 	return 3 * layer_level + state_level;
@@ -129,62 +153,86 @@ int stack_level(client_t *c)
 
 int stack_cmp(client_t *c1, client_t *c2)
 {
+	if (!c1 && !c2)
+		return 0;
+	if (!c1)
+		return -1;
+	if (!c2)
+		return 1;
+
 	return stack_level(c1) - stack_level(c2);
 }
 
 stacking_list_t *limit_above(node_t *n)
 {
+	if (!n || !n->client)
+		return NULL;
+
 	stacking_list_t *s = stack_head;
-	while (s != NULL && stack_cmp(n->client, s->node->client) >= 0) {
+	while (s && s->node && s->node->client &&
+	       stack_cmp(n->client, s->node->client) >= 0) {
 		s = s->next;
 	}
-	if (s == NULL) {
+
+	if (!s)
 		s = stack_tail;
-	}
-	if (s->node == n) {
+
+	if (s && s->node == n)
 		s = s->prev;
-	}
+
 	return s;
 }
 
 stacking_list_t *limit_below(node_t *n)
 {
+	if (!n || !n->client)
+		return NULL;
+
 	stacking_list_t *s = stack_tail;
-	while (s != NULL && stack_cmp(n->client, s->node->client) <= 0) {
+	while (s && s->node && s->node->client &&
+	       stack_cmp(n->client, s->node->client) <= 0) {
 		s = s->prev;
 	}
-	if (s == NULL) {
+
+	if (!s)
 		s = stack_head;
-	}
-	if (s->node == n) {
+
+	if (s && s->node == n)
 		s = s->next;
-	}
+
 	return s;
 }
 
 void stack(desktop_t *d, node_t *n, bool focused)
 {
-	for (node_t *f = first_extrema(n); f != NULL; f = next_leaf(f, n)) {
-		if (f->client == NULL || (IS_FLOATING(f->client) && !auto_raise)) {
-			continue;
-		}
+	if (!d || !n)
+		return;
 
-		if (stack_head == NULL) {
+	for (node_t *f = first_extrema(n); f; f = next_leaf(f, n)) {
+		if (!f->client || (IS_FLOATING(f->client) && !auto_raise))
+			continue;
+
+		if (!stack_head) {
 			stack_insert_after(NULL, f);
 		} else {
-			stacking_list_t *s = (focused ? limit_above(f) : limit_below(f));
-			if (s == NULL) {
+			stacking_list_t *s = focused ? limit_above(f) : limit_below(f);
+			if (!s)
 				continue;
-			}
+
+			if (!s->node || !s->node->client)
+				continue;
+
 			int i = stack_cmp(f->client, s->node->client);
 			if (i < 0 || (i == 0 && !focused)) {
 				stack_insert_before(s, f);
 				window_below(f->id, s->node->id);
-				put_status(SBSC_MASK_NODE_STACK, "node_stack 0x%08X below 0x%08X\n", f->id, s->node->id);
+				put_status(SBSC_MASK_NODE_STACK, "node_stack 0x%08X below 0x%08X\n",
+				          f->id, s->node->id);
 			} else {
 				stack_insert_after(s, f);
 				window_above(f->id, s->node->id);
-				put_status(SBSC_MASK_NODE_STACK, "node_stack 0x%08X above 0x%08X\n", f->id, s->node->id);
+				put_status(SBSC_MASK_NODE_STACK, "node_stack 0x%08X above 0x%08X\n",
+				          f->id, s->node->id);
 			}
 		}
 	}
@@ -195,24 +243,31 @@ void stack(desktop_t *d, node_t *n, bool focused)
 
 void restack_presel_feedbacks(desktop_t *d)
 {
+	if (!d)
+		return;
+
 	stacking_list_t *s = stack_tail;
-	while (s != NULL && !IS_TILED(s->node->client)) {
+	while (s && s->node && s->node->client && !IS_TILED(s->node->client)) {
 		s = s->prev;
 	}
-	if (s != NULL) {
-		restack_presel_feedbacks_in(d->root, s->node);
-	}
+
+	if (s && s->node)
+		restack_presel_feedbacks_in_depth(d->root, s->node, 0);
+}
+
+static void restack_presel_feedbacks_in_depth(node_t *r, node_t *n, int depth)
+{
+	if (!r || !n || depth > MAX_STACK_DEPTH)
+		return;
+
+	if (r->presel)
+		window_above(r->presel->feedback, n->id);
+
+	restack_presel_feedbacks_in_depth(r->first_child, n, depth + 1);
+	restack_presel_feedbacks_in_depth(r->second_child, n, depth + 1);
 }
 
 void restack_presel_feedbacks_in(node_t *r, node_t *n)
 {
-	if (r == NULL) {
-		return;
-	} else {
-		if (r->presel != NULL) {
-			window_above(r->presel->feedback, n->id);
-		}
-		restack_presel_feedbacks_in(r->first_child, n);
-		restack_presel_feedbacks_in(r->second_child, n);
-	}
+	restack_presel_feedbacks_in_depth(r, n, 0);
 }
