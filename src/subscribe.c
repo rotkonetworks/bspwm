@@ -66,6 +66,7 @@ void remove_subscriber(subscriber_list_t *sb)
 	}
 	if (restart) {
 		int cli_fd = fileno(sb->stream);
+		/* Keep fd open for restart but mark for cleanup */
 		fcntl(cli_fd, F_SETFD, ~FD_CLOEXEC & fcntl(cli_fd, F_GETFD));
 	} else {
 		fclose(sb->stream);
