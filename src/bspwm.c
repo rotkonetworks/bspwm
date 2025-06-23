@@ -87,8 +87,8 @@ bool auto_raise;
 bool sticky_still;
 bool hide_sticky;
 bool record_history;
-bool running;
-bool restart;
+volatile bool running;
+volatile bool restart;
 bool randr;
 
 int main(int argc, char *argv[])
