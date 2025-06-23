@@ -2,577 +2,522 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <errno.h>
 #include "parse.h"
 
+// binary search tables for O(log n) lookups
+typedef struct {
+   const char *key;
+   int value;
+} lookup_entry_t;
+
+#define LOOKUP_TABLE(name, type) \
+static const struct { const char *key; type value; } name##_table[] =
+
+#define BINARY_SEARCH_PARSER(name, type) \
+bool parse_##name(char *s, type *v) { \
+   int left = 0, right = sizeof(name##_table)/sizeof(name##_table[0]) - 1; \
+   while (left <= right) { \
+       int mid = (left + right) >> 1; \
+       int cmp = strcmp(s, name##_table[mid].key); \
+       if (cmp == 0) { \
+           *v = name##_table[mid].value; \
+           return true; \
+       } \
+       left = cmp > 0 ? mid + 1 : left; \
+       right = cmp < 0 ? mid - 1 : right; \
+   } \
+   return false; \
+}
+
+// sorted lookup tables
+LOOKUP_TABLE(split_type, split_type_t) {
+   {"horizontal", TYPE_HORIZONTAL},
+   {"vertical", TYPE_VERTICAL}
+};
+
+LOOKUP_TABLE(split_mode, split_mode_t) {
+   {"automatic", MODE_AUTOMATIC},
+   {"vertical", MODE_MANUAL}
+};
+
+LOOKUP_TABLE(layout, layout_t) {
+   {"monocle", LAYOUT_MONOCLE},
+   {"tiled", LAYOUT_TILED}
+};
+
+LOOKUP_TABLE(client_state, client_state_t) {
+   {"floating", STATE_FLOATING},
+   {"fullscreen", STATE_FULLSCREEN},
+   {"pseudo_tiled", STATE_PSEUDO_TILED},
+   {"tiled", STATE_TILED}
+};
+
+LOOKUP_TABLE(stack_layer, stack_layer_t) {
+   {"above", LAYER_ABOVE},
+   {"below", LAYER_BELOW},
+   {"normal", LAYER_NORMAL}
+};
+
+LOOKUP_TABLE(direction, direction_t) {
+   {"east", DIR_EAST},
+   {"north", DIR_NORTH},
+   {"south", DIR_SOUTH},
+   {"west", DIR_WEST}
+};
+
+LOOKUP_TABLE(cycle_direction, cycle_dir_t) {
+   {"next", CYCLE_NEXT},
+   {"prev", CYCLE_PREV}
+};
+
+LOOKUP_TABLE(circulate_direction, circulate_dir_t) {
+   {"backward", CIRCULATE_BACKWARD},
+   {"forward", CIRCULATE_FORWARD}
+};
+
+LOOKUP_TABLE(history_direction, history_dir_t) {
+   {"newer", HISTORY_NEWER},
+   {"older", HISTORY_OLDER}
+};
+
+LOOKUP_TABLE(flip, flip_t) {
+   {"horizontal", FLIP_HORIZONTAL},
+   {"vertical", FLIP_VERTICAL}
+};
+
+LOOKUP_TABLE(resize_handle, resize_handle_t) {
+   {"bottom", HANDLE_BOTTOM},
+   {"bottom_left", HANDLE_BOTTOM_LEFT},
+   {"bottom_right", HANDLE_BOTTOM_RIGHT},
+   {"left", HANDLE_LEFT},
+   {"right", HANDLE_RIGHT},
+   {"top", HANDLE_TOP},
+   {"top_left", HANDLE_TOP_LEFT},
+   {"top_right", HANDLE_TOP_RIGHT}
+};
+
+LOOKUP_TABLE(pointer_action, pointer_action_t) {
+   {"focus", ACTION_FOCUS},
+   {"move", ACTION_MOVE},
+   {"none", ACTION_NONE},
+   {"resize_corner", ACTION_RESIZE_CORNER},
+   {"resize_side", ACTION_RESIZE_SIDE}
+};
+
+LOOKUP_TABLE(child_polarity, child_polarity_t) {
+   {"first_child", FIRST_CHILD},
+   {"second_child", SECOND_CHILD}
+};
+
+LOOKUP_TABLE(automatic_scheme, automatic_scheme_t) {
+   {"alternate", SCHEME_ALTERNATE},
+   {"longest_side", SCHEME_LONGEST_SIDE},
+   {"spiral", SCHEME_SPIRAL}
+};
+
+LOOKUP_TABLE(tightness, tightness_t) {
+   {"high", TIGHTNESS_HIGH},
+   {"low", TIGHTNESS_LOW}
+};
+
+// generate binary search functions
+BINARY_SEARCH_PARSER(split_type, split_type_t)
+BINARY_SEARCH_PARSER(split_mode, split_mode_t)
+BINARY_SEARCH_PARSER(layout, layout_t)
+BINARY_SEARCH_PARSER(client_state, client_state_t)
+BINARY_SEARCH_PARSER(stack_layer, stack_layer_t)
+BINARY_SEARCH_PARSER(direction, direction_t)
+BINARY_SEARCH_PARSER(cycle_direction, cycle_dir_t)
+BINARY_SEARCH_PARSER(circulate_direction, circulate_dir_t)
+BINARY_SEARCH_PARSER(history_direction, history_dir_t)
+BINARY_SEARCH_PARSER(flip, flip_t)
+BINARY_SEARCH_PARSER(resize_handle, resize_handle_t)
+BINARY_SEARCH_PARSER(pointer_action, pointer_action_t)
+BINARY_SEARCH_PARSER(child_polarity, child_polarity_t)
+BINARY_SEARCH_PARSER(automatic_scheme, automatic_scheme_t)
+BINARY_SEARCH_PARSER(tightness, tightness_t)
+
+// optimized bool parser - check first char
 bool parse_bool(char *value, bool *b)
 {
-    if (value == NULL || strlen(value) > 10) {  // "false" is 5 chars, be generous
-        return false;
-    }
+   if (!value) return false;
 
-    if (streq("true", value) || streq("on", value)) {
-        *b = true;
-        return true;
-    } else if (streq("false", value) || streq("off", value)) {
-        *b = false;
-        return true;
-    }
-    return false;
-}
-
-bool parse_split_type(char *s, split_type_t *t)
-{
-	if (streq("horizontal", s)) {
-		*t = TYPE_HORIZONTAL;
-		return true;
-	} else if (streq("vertical", s)) {
-		*t = TYPE_VERTICAL;
-		return true;
-	}
-	return false;
-}
-
-bool parse_split_mode(char *s, split_mode_t *m)
-{
-	if (streq("automatic", s)) {
-		*m = MODE_AUTOMATIC;
-		return true;
-	} else if (streq("vertical", s)) {
-		*m = MODE_MANUAL;
-		return true;
-	}
-	return false;
-}
-
-bool parse_layout(char *s, layout_t *l)
-{
-	if (streq("monocle", s)) {
-		*l = LAYOUT_MONOCLE;
-		return true;
-	} else if (streq("tiled", s)) {
-		*l = LAYOUT_TILED;
-		return true;
-	}
-	return false;
-}
-
-bool parse_client_state(char *s, client_state_t *t)
-{
-	if (streq("tiled", s)) {
-		*t = STATE_TILED;
-		return true;
-	} else if (streq("pseudo_tiled", s)) {
-		*t = STATE_PSEUDO_TILED;
-		return true;
-	} else if (streq("floating", s)) {
-		*t = STATE_FLOATING;
-		return true;
-	} else if (streq("fullscreen", s)) {
-		*t = STATE_FULLSCREEN;
-		return true;
-	}
-	return false;
-}
-
-bool parse_stack_layer(char *s, stack_layer_t *l)
-{
-	if (streq("below", s)) {
-		*l = LAYER_BELOW;
-		return true;
-	} else if (streq("normal", s)) {
-		*l = LAYER_NORMAL;
-		return true;
-	} else if (streq("above", s)) {
-		*l = LAYER_ABOVE;
-		return true;
-	}
-	return false;
-}
-
-bool parse_direction(char *s, direction_t *d)
-{
-	if (streq("north", s)) {
-		*d = DIR_NORTH;
-		return true;
-	} else if (streq("west", s)) {
-		*d = DIR_WEST;
-		return true;
-	} else if (streq("south", s)) {
-		*d = DIR_SOUTH;
-		return true;
-	} else if (streq("east", s)) {
-		*d = DIR_EAST;
-		return true;
-	}
-	return false;
-}
-
-bool parse_cycle_direction(char *s, cycle_dir_t *d)
-{
-	if (streq("next", s)) {
-		*d = CYCLE_NEXT;
-		return true;
-	} else if (streq("prev", s)) {
-		*d = CYCLE_PREV;
-		return true;
-	}
-	return false;
-}
-
-bool parse_circulate_direction(char *s, circulate_dir_t *d)
-{
-	if (streq("forward", s)) {
-		*d = CIRCULATE_FORWARD;
-		return true;
-	} else if (streq("backward", s)) {
-		*d = CIRCULATE_BACKWARD;
-		return true;
-	}
-	return false;
-}
-
-bool parse_history_direction(char *s, history_dir_t *d)
-{
-	if (streq("older", s)) {
-		*d = HISTORY_OLDER;
-		return true;
-	} else if (streq("newer", s)) {
-		*d = HISTORY_NEWER;
-		return true;
-	}
-	return false;
-}
-
-
-bool parse_flip(char *s, flip_t *f)
-{
-	if (streq("horizontal", s)) {
-		*f = FLIP_HORIZONTAL;
-		return true;
-	} else if (streq("vertical", s)) {
-		*f = FLIP_VERTICAL;
-		return true;
-	}
-	return false;
-}
-
-bool parse_resize_handle(char *s, resize_handle_t *h)
-{
-	if (streq("left", s)) {
-		*h = HANDLE_LEFT;
-		return true;
-	} else if (streq("top", s)) {
-		*h = HANDLE_TOP;
-		return true;
-	} else if (streq("right", s)) {
-		*h = HANDLE_RIGHT;
-		return true;
-	} else if (streq("bottom", s)) {
-		*h = HANDLE_BOTTOM;
-		return true;
-	} else if (streq("top_left", s)) {
-		*h = HANDLE_TOP_LEFT;
-		return true;
-	} else if (streq("top_right", s)) {
-		*h = HANDLE_TOP_RIGHT;
-		return true;
-	} else if (streq("bottom_right", s)) {
-		*h = HANDLE_BOTTOM_RIGHT;
-		return true;
-	} else if (streq("bottom_left", s)) {
-		*h = HANDLE_BOTTOM_LEFT;
-		return true;
-	}
-	return false;
-}
-
-bool parse_modifier_mask(char *s, uint16_t *m)
-{
-	if (strcmp(s, "shift") == 0) {
-		*m = XCB_MOD_MASK_SHIFT;
-		return true;
-	} else if (strcmp(s, "control") == 0) {
-		*m = XCB_MOD_MASK_CONTROL;
-		return true;
-	} else if (strcmp(s, "lock") == 0) {
-		*m = XCB_MOD_MASK_LOCK;
-		return true;
-	} else if (strcmp(s, "mod1") == 0) {
-		*m = XCB_MOD_MASK_1;
-		return true;
-	} else if (strcmp(s, "mod2") == 0) {
-		*m = XCB_MOD_MASK_2;
-		return true;
-	} else if (strcmp(s, "mod3") == 0) {
-		*m = XCB_MOD_MASK_3;
-		return true;
-	} else if (strcmp(s, "mod4") == 0) {
-		*m = XCB_MOD_MASK_4;
-		return true;
-	} else if (strcmp(s, "mod5") == 0) {
-		*m = XCB_MOD_MASK_5;
-		return true;
-	}
-	return false;
-}
-
-bool parse_button_index(char *s, int8_t *b)
-{
-	if (strcmp(s, "any") == 0) {
-		*b = XCB_BUTTON_INDEX_ANY;
-		return true;
-	} else if (strcmp(s, "button1") == 0) {
-		*b = XCB_BUTTON_INDEX_1;
-		return true;
-	} else if (strcmp(s, "button2") == 0) {
-		*b = XCB_BUTTON_INDEX_2;
-		return true;
-	} else if (strcmp(s, "button3") == 0) {
-		*b = XCB_BUTTON_INDEX_3;
-		return true;
-	} else if (strcmp(s, "none") == 0) {
-		*b = -1;
-		return true;
-	}
-	return false;
-}
-
-bool parse_pointer_action(char *s, pointer_action_t *a)
-{
-	if (streq("move", s)) {
-		*a = ACTION_MOVE;
-		return true;
-	} else if (streq("resize_corner", s)) {
-		*a = ACTION_RESIZE_CORNER;
-		return true;
-	} else if (streq("resize_side", s)) {
-		*a = ACTION_RESIZE_SIDE;
-		return true;
-	} else if (streq("focus", s)) {
-		*a = ACTION_FOCUS;
-		return true;
-	} else if (streq("none", s)) {
-		*a = ACTION_NONE;
-		return true;
-	}
-	return false;
-}
-
-bool parse_child_polarity(char *s, child_polarity_t *p)
-{
-	if (streq("first_child", s)) {
-		*p = FIRST_CHILD;
-		return true;
-	} else if (streq("second_child", s)) {
-		*p = SECOND_CHILD;
-		return true;
-	}
-	return false;
-}
-
-bool parse_automatic_scheme(char *s, automatic_scheme_t *a)
-{
-	if (streq("longest_side", s)) {
-		*a = SCHEME_LONGEST_SIDE;
-		return true;
-	} else if (streq("alternate", s)) {
-		*a = SCHEME_ALTERNATE;
-		return true;
-	} else if (streq("spiral", s)) {
-		*a = SCHEME_SPIRAL;
-		return true;
-	}
-	return false;
+   switch (value[0]) {
+       case 't':
+           if (value[1] == 'r' && value[2] == 'u' &&
+               value[3] == 'e' && value[4] == '\0') {
+               *b = true;
+               return true;
+           }
+           break;
+       case 'o':
+           if (value[1] == 'n' && value[2] == '\0') {
+               *b = true;
+               return true;
+           } else if (value[1] == 'f' && value[2] == 'f' && value[3] == '\0') {
+               *b = false;
+               return true;
+           }
+           break;
+       case 'f':
+           if (value[1] == 'a' && value[2] == 'l' &&
+               value[3] == 's' && value[4] == 'e' && value[5] == '\0') {
+               *b = false;
+               return true;
+           }
+           break;
+   }
+   return false;
 }
 
 bool parse_honor_size_hints_mode(char *s, honor_size_hints_mode_t *a)
 {
-	bool b;
-	if (parse_bool(s, &b)) {
-		*a = b ? HONOR_SIZE_HINTS_YES : HONOR_SIZE_HINTS_NO;
-		return true;
-	} else if (streq("floating", s)) {
-		*a = HONOR_SIZE_HINTS_FLOATING;
-		return true;
-	} else if (streq("tiled", s)) {
-		*a = HONOR_SIZE_HINTS_TILED;
-		return true;
-	}
-	return false;
+   bool b;
+   if (parse_bool(s, &b)) {
+       *a = b ? HONOR_SIZE_HINTS_YES : HONOR_SIZE_HINTS_NO;
+       return true;
+   }
+
+   if (s[0] == 'f' && strcmp(s, "floating") == 0) {
+       *a = HONOR_SIZE_HINTS_FLOATING;
+       return true;
+   } else if (s[0] == 't' && strcmp(s, "tiled") == 0) {
+       *a = HONOR_SIZE_HINTS_TILED;
+       return true;
+   }
+   return false;
 }
 
+// Optimized state transition parser
 bool parse_state_transition(char *s, state_transition_t *m)
 {
-	if (streq("none", s)) {
-		*m = 0;
-		return true;
-	} else if (streq("all", s)) {
-		*m = STATE_TRANSITION_ENTER | STATE_TRANSITION_EXIT;
-		return true;
-	} else {
-		state_transition_t w = 0;
-		char *x = copy_string(s, strlen(s));
-		char *key = strtok(x, ",");
-		while (key != NULL) {
-			if (streq("enter", key)) {
-				w |= STATE_TRANSITION_ENTER;
-			} else if (streq("exit", key)) {
-				w |= STATE_TRANSITION_EXIT;
-			} else {
-				free(x);
-				return false;
-			}
-			key = strtok(NULL, ",");
-		}
-		free(x);
-		if (w != 0) {
-			*m = w;
-			return true;
-		} else {
-			return false;
-		}
-	}
-	return false;
+   if (s[0] == 'n' && strcmp(s, "none") == 0) {
+       *m = 0;
+       return true;
+   } else if (s[0] == 'a' && strcmp(s, "all") == 0) {
+       *m = STATE_TRANSITION_ENTER | STATE_TRANSITION_EXIT;
+       return true;
+   }
+
+   state_transition_t w = 0;
+   char *x = copy_string(s, strlen(s));
+   char *key = strtok(x, ",");
+
+   while (key != NULL) {
+       if (key[0] == 'e') {
+           if (strcmp(key, "enter") == 0) {
+               w |= STATE_TRANSITION_ENTER;
+           } else if (strcmp(key, "exit") == 0) {
+               w |= STATE_TRANSITION_EXIT;
+           } else {
+               free(x);
+               return false;
+           }
+       } else {
+           free(x);
+           return false;
+       }
+       key = strtok(NULL, ",");
+   }
+
+   free(x);
+   return w != 0 ? (*m = w, true) : false;
 }
 
-bool parse_tightness(char *s, tightness_t *t)
-{
-	if (streq("high", s)) {
-		*t = TIGHTNESS_HIGH;
-		return true;
-	} else if (streq("low", s)) {
-		*t = TIGHTNESS_LOW;
-		return true;
-	}
-	return false;
-}
+// Lookup table for valid degrees
+static const bool valid_degrees[360] = {
+   [0] = true, [90] = true, [180] = true, [270] = true
+};
 
 bool parse_degree(char *s, int *d)
 {
-	int i = atoi(s);
-	while (i < 0)
-		i += 360;
-	while (i > 359)
-		i -= 360;
-	if ((i % 90) != 0) {
-		return false;
-	} else {
-		*d = i;
-		return true;
-	}
+   int i = atoi(s);
+   i = ((i % 360) + 360) % 360;
+
+   if (valid_degrees[i]) {
+       *d = i;
+       return true;
+   }
+   return false;
 }
 
 bool parse_id(char *s, uint32_t *id)
 {
-	char *end;
-	errno = 0;
-	uint32_t v = strtol(s, &end, 0);
-	if (errno != 0 || *end != '\0') {
-		return false;
-	}
-	*id = v;
-	return true;
+   char *end;
+   errno = 0;
+   uint32_t v = strtol(s, &end, 0);
+   if (errno != 0 || *end != '\0') {
+       return false;
+   }
+   *id = v;
+   return true;
 }
 
 bool parse_bool_declaration(char *s, char **key, bool *value, alter_state_t *state)
 {
-	*key = strtok(s, EQL_TOK);
-	char *v = strtok(NULL, EQL_TOK);
-	if (v == NULL) {
-		*state = ALTER_TOGGLE;
-		return true;
-	} else {
-		if (parse_bool(v, value)) {
-			*state = ALTER_SET;
-			return true;
-		} else {
-			return false;
-		}
-	}
-	return false;
+   *key = strtok(s, EQL_TOK);
+   char *v = strtok(NULL, EQL_TOK);
+   if (v == NULL) {
+       *state = ALTER_TOGGLE;
+       return true;
+   } else {
+       if (parse_bool(v, value)) {
+           *state = ALTER_SET;
+           return true;
+       }
+   }
+   return false;
 }
 
 bool parse_index(char *s, uint16_t *idx)
 {
-	return (sscanf(s, "^%hu", idx) == 1);
+   if (*s == '^') {
+       char *end;
+       unsigned long val = strtoul(s + 1, &end, 10);
+       if (*end == '\0' && val <= UINT16_MAX) {
+           *idx = (uint16_t)val;
+           return true;
+       }
+   }
+   return false;
 }
 
+// optimized rectangle parser - manual parsing instead of sscanf
 bool parse_rectangle(char *s, xcb_rectangle_t *r)
 {
-	uint16_t w, h;
-	int16_t x, y;
-	if (sscanf(s, "%hux%hu+%hi+%hi", &w, &h, &x, &y) != 4) {
-		return false;
-	}
-	r->width = w;
-	r->height = h;
-	r->x = x;
-	r->y = y;
-	return true;
+   char *end;
+
+   unsigned long w = strtoul(s, &end, 10);
+   if (*end != 'x' || w > UINT16_MAX) return false;
+
+   s = end + 1;
+   unsigned long h = strtoul(s, &end, 10);
+   if (*end != '+' || h > UINT16_MAX) return false;
+
+   s = end + 1;
+   long x = strtol(s, &end, 10);
+   if (*end != '+' || x < INT16_MIN || x > INT16_MAX) return false;
+
+   s = end + 1;
+   long y = strtol(s, &end, 10);
+   if (*end != '\0' || y < INT16_MIN || y > INT16_MAX) return false;
+
+   r->width = (uint16_t)w;
+   r->height = (uint16_t)h;
+   r->x = (int16_t)x;
+   r->y = (int16_t)y;
+   return true;
 }
+
+// modifier mask lookup table
+static const struct {
+   const char *key;
+   uint16_t mask;
+} modifier_table[] = {
+   {"control", XCB_MOD_MASK_CONTROL},
+   {"lock", XCB_MOD_MASK_LOCK},
+   {"mod1", XCB_MOD_MASK_1},
+   {"mod2", XCB_MOD_MASK_2},
+   {"mod3", XCB_MOD_MASK_3},
+   {"mod4", XCB_MOD_MASK_4},
+   {"mod5", XCB_MOD_MASK_5},
+   {"shift", XCB_MOD_MASK_SHIFT}
+};
+
+bool parse_modifier_mask(char *s, uint16_t *m)
+{
+   int left = 0, right = sizeof(modifier_table)/sizeof(modifier_table[0]) - 1;
+
+   while (left <= right) {
+       int mid = (left + right) >> 1;
+       int cmp = strcmp(s, modifier_table[mid].key);
+       if (cmp == 0) {
+           *m = modifier_table[mid].mask;
+           return true;
+       }
+       left = cmp > 0 ? mid + 1 : left;
+       right = cmp < 0 ? mid - 1 : right;
+   }
+   return false;
+}
+
+bool parse_button_index(char *s, int8_t *b)
+{
+   switch (s[0]) {
+       case 'a':
+           if (strcmp(s, "any") == 0) {
+               *b = XCB_BUTTON_INDEX_ANY;
+               return true;
+           }
+           break;
+       case 'b':
+           if (s[1] == 'u' && s[2] == 't' && s[3] == 't' && s[4] == 'o' && s[5] == 'n') {
+               if (s[6] >= '1' && s[6] <= '3' && s[7] == '\0') {
+                   *b = s[6] - '0';
+                   return true;
+               }
+           }
+           break;
+       case 'n':
+           if (strcmp(s, "none") == 0) {
+               *b = -1;
+               return true;
+           }
+           break;
+   }
+   return false;
+}
+
+// Subscriber mask sorted table
+static const struct {
+   const char *name;
+   subscriber_mask_t mask;
+} subscriber_table[] = {
+   {"all", SBSC_MASK_ALL},
+   {"desktop", SBSC_MASK_DESKTOP},
+   {"desktop_activate", SBSC_MASK_DESKTOP_ACTIVATE},
+   {"desktop_add", SBSC_MASK_DESKTOP_ADD},
+   {"desktop_focus", SBSC_MASK_DESKTOP_FOCUS},
+   {"desktop_layout", SBSC_MASK_DESKTOP_LAYOUT},
+   {"desktop_remove", SBSC_MASK_DESKTOP_REMOVE},
+   {"desktop_rename", SBSC_MASK_DESKTOP_RENAME},
+   {"desktop_swap", SBSC_MASK_DESKTOP_SWAP},
+   {"desktop_transfer", SBSC_MASK_DESKTOP_TRANSFER},
+   {"monitor", SBSC_MASK_MONITOR},
+   {"monitor_add", SBSC_MASK_MONITOR_ADD},
+   {"monitor_focus", SBSC_MASK_MONITOR_FOCUS},
+   {"monitor_geometry", SBSC_MASK_MONITOR_GEOMETRY},
+   {"monitor_remove", SBSC_MASK_MONITOR_REMOVE},
+   {"monitor_rename", SBSC_MASK_MONITOR_RENAME},
+   {"monitor_swap", SBSC_MASK_MONITOR_SWAP},
+   {"node", SBSC_MASK_NODE},
+   {"node_activate", SBSC_MASK_NODE_ACTIVATE},
+   {"node_add", SBSC_MASK_NODE_ADD},
+   {"node_flag", SBSC_MASK_NODE_FLAG},
+   {"node_focus", SBSC_MASK_NODE_FOCUS},
+   {"node_geometry", SBSC_MASK_NODE_GEOMETRY},
+   {"node_layer", SBSC_MASK_NODE_LAYER},
+   {"node_presel", SBSC_MASK_NODE_PRESEL},
+   {"node_remove", SBSC_MASK_NODE_REMOVE},
+   {"node_stack", SBSC_MASK_NODE_STACK},
+   {"node_state", SBSC_MASK_NODE_STATE},
+   {"node_swap", SBSC_MASK_NODE_SWAP},
+   {"node_transfer", SBSC_MASK_NODE_TRANSFER},
+   {"pointer_action", SBSC_MASK_POINTER_ACTION},
+   {"report", SBSC_MASK_REPORT}
+};
 
 bool parse_subscriber_mask(char *s, subscriber_mask_t *mask)
 {
-	if (streq("all", s)) {
-		*mask = SBSC_MASK_ALL;
-	} else if (streq("node", s)) {
-		*mask = SBSC_MASK_NODE;
-	} else if (streq("desktop", s)) {
-		*mask = SBSC_MASK_DESKTOP;
-	} else if (streq("monitor", s)) {
-		*mask = SBSC_MASK_MONITOR;
-	} else if (streq("pointer_action", s)) {
-		*mask = SBSC_MASK_POINTER_ACTION;
-	} else if (streq("node_add", s)) {
-		*mask = SBSC_MASK_NODE_ADD;
-	} else if (streq("node_remove", s)) {
-		*mask = SBSC_MASK_NODE_REMOVE;
-	} else if (streq("node_swap", s)) {
-		*mask = SBSC_MASK_NODE_SWAP;
-	} else if (streq("node_transfer", s)) {
-		*mask = SBSC_MASK_NODE_TRANSFER;
-	} else if (streq("node_focus", s)) {
-		*mask = SBSC_MASK_NODE_FOCUS;
-	} else if (streq("node_presel", s)) {
-		*mask = SBSC_MASK_NODE_PRESEL;
-	} else if (streq("node_stack", s)) {
-		*mask = SBSC_MASK_NODE_STACK;
-	} else if (streq("node_activate", s)) {
-		*mask = SBSC_MASK_NODE_ACTIVATE;
-	} else if (streq("node_geometry", s)) {
-		*mask = SBSC_MASK_NODE_GEOMETRY;
-	} else if (streq("node_state", s)) {
-		*mask = SBSC_MASK_NODE_STATE;
-	} else if (streq("node_flag", s)) {
-		*mask = SBSC_MASK_NODE_FLAG;
-	} else if (streq("node_layer", s)) {
-		*mask = SBSC_MASK_NODE_LAYER;
-	} else if (streq("desktop_add", s)) {
-		*mask = SBSC_MASK_DESKTOP_ADD;
-	} else if (streq("desktop_rename", s)) {
-		*mask = SBSC_MASK_DESKTOP_RENAME;
-	} else if (streq("desktop_remove", s)) {
-		*mask = SBSC_MASK_DESKTOP_REMOVE;
-	} else if (streq("desktop_swap", s)) {
-		*mask = SBSC_MASK_DESKTOP_SWAP;
-	} else if (streq("desktop_transfer", s)) {
-		*mask = SBSC_MASK_DESKTOP_TRANSFER;
-	} else if (streq("desktop_focus", s)) {
-		*mask = SBSC_MASK_DESKTOP_FOCUS;
-	} else if (streq("desktop_activate", s)) {
-		*mask = SBSC_MASK_DESKTOP_ACTIVATE;
-	} else if (streq("desktop_layout", s)) {
-		*mask = SBSC_MASK_DESKTOP_LAYOUT;
-	} else if (streq("monitor_add", s)) {
-		*mask = SBSC_MASK_MONITOR_ADD;
-	} else if (streq("monitor_rename", s)) {
-		*mask = SBSC_MASK_MONITOR_RENAME;
-	} else if (streq("monitor_remove", s)) {
-		*mask = SBSC_MASK_MONITOR_REMOVE;
-	} else if (streq("monitor_swap", s)) {
-		*mask = SBSC_MASK_MONITOR_SWAP;
-	} else if (streq("monitor_focus", s)) {
-		*mask = SBSC_MASK_MONITOR_FOCUS;
-	} else if (streq("monitor_geometry", s)) {
-		*mask = SBSC_MASK_MONITOR_GEOMETRY;
-	} else if (streq("report", s)) {
-		*mask = SBSC_MASK_REPORT;
-	} else {
-		return false;
-	}
-	return true;
+   int left = 0, right = sizeof(subscriber_table)/sizeof(subscriber_table[0]) - 1;
+
+   while (left <= right) {
+       int mid = (left + right) >> 1;
+       int cmp = strcmp(s, subscriber_table[mid].name);
+       if (cmp == 0) {
+           *mask = subscriber_table[mid].mask;
+           return true;
+       }
+       left = cmp > 0 ? mid + 1 : left;
+       right = cmp < 0 ? mid - 1 : right;
+   }
+   return false;
 }
 
-
-#define GET_MOD(k) \
-	} else if (streq(#k, tok)) { \
-		sel->k = OPTION_TRUE; \
-	} else if (streq("!" #k, tok)) { \
-		sel->k = OPTION_FALSE;
+// Modifier parsing using string interning
+#define PARSE_MODIFIER(name, field) \
+   if (strcmp(#field, tok) == 0) { \
+       sel->field = OPTION_TRUE; \
+   } else if (tok[0] == '!' && strcmp(#field, tok + 1) == 0) { \
+       sel->field = OPTION_FALSE; \
+   }
 
 bool parse_monitor_modifiers(char *desc, monitor_select_t *sel)
 {
-	char *tok;
-	while ((tok = strrchr(desc, CAT_CHR)) != NULL) {
-		tok[0] = '\0';
-		tok++;
-		if (streq("occupied", tok)) {
-			sel->occupied = OPTION_TRUE;
-		} else if (streq("!occupied", tok)) {
-			sel->occupied = OPTION_FALSE;
-		GET_MOD(focused)
-		} else {
-			return false;
-		}
-	}
-	return true;
+   char *tok;
+   while ((tok = strrchr(desc, CAT_CHR)) != NULL) {
+       tok[0] = '\0';
+       tok++;
+
+       if (strcmp("occupied", tok) == 0) {
+           sel->occupied = OPTION_TRUE;
+       } else if (tok[0] == '!' && strcmp("occupied", tok + 1) == 0) {
+           sel->occupied = OPTION_FALSE;
+       } else PARSE_MODIFIER(monitor, focused)
+       else {
+           return false;
+       }
+   }
+   return true;
 }
 
 bool parse_desktop_modifiers(char *desc, desktop_select_t *sel)
 {
-	char *tok;
-	while ((tok = strrchr(desc, CAT_CHR)) != NULL) {
-		tok[0] = '\0';
-		tok++;
-		if (streq("occupied", tok)) {
-			sel->occupied = OPTION_TRUE;
-		} else if (streq("!occupied", tok)) {
-			sel->occupied = OPTION_FALSE;
-		GET_MOD(focused)
-		GET_MOD(active)
-		GET_MOD(urgent)
-		GET_MOD(local)
-		GET_MOD(tiled)
-		GET_MOD(monocle)
-		GET_MOD(user_tiled)
-		GET_MOD(user_monocle)
-		} else {
-			return false;
-		}
-	}
-	return true;
+   char *tok;
+   while ((tok = strrchr(desc, CAT_CHR)) != NULL) {
+       tok[0] = '\0';
+       tok++;
 
+       if (strcmp("occupied", tok) == 0) {
+           sel->occupied = OPTION_TRUE;
+       } else if (tok[0] == '!' && strcmp("occupied", tok + 1) == 0) {
+           sel->occupied = OPTION_FALSE;
+       }
+       else PARSE_MODIFIER(desktop, focused)
+       else PARSE_MODIFIER(desktop, active)
+       else PARSE_MODIFIER(desktop, urgent)
+       else PARSE_MODIFIER(desktop, local)
+       else PARSE_MODIFIER(desktop, tiled)
+       else PARSE_MODIFIER(desktop, monocle)
+       else PARSE_MODIFIER(desktop, user_tiled)
+       else PARSE_MODIFIER(desktop, user_monocle)
+       else {
+           return false;
+       }
+   }
+   return true;
 }
 
 bool parse_node_modifiers(char *desc, node_select_t *sel)
 {
-	char *tok;
-	while ((tok = strrchr(desc, CAT_CHR)) != NULL) {
-		tok[0] = '\0';
-		tok++;
-		if (streq("tiled", tok)) {
-			sel->tiled = OPTION_TRUE;
-		} else if (streq("!tiled", tok)) {
-			sel->tiled = OPTION_FALSE;
-		GET_MOD(automatic)
-		GET_MOD(focused)
-		GET_MOD(active)
-		GET_MOD(local)
-		GET_MOD(leaf)
-		GET_MOD(window)
-		GET_MOD(pseudo_tiled)
-		GET_MOD(floating)
-		GET_MOD(fullscreen)
-		GET_MOD(hidden)
-		GET_MOD(sticky)
-		GET_MOD(private)
-		GET_MOD(locked)
-		GET_MOD(marked)
-		GET_MOD(urgent)
-		GET_MOD(same_class)
-		GET_MOD(descendant_of)
-		GET_MOD(ancestor_of)
-		GET_MOD(below)
-		GET_MOD(normal)
-		GET_MOD(above)
-		GET_MOD(horizontal)
-		GET_MOD(vertical)
-		} else {
-			return false;
-		}
-	}
-	return true;
-}
+   char *tok;
+   while ((tok = strrchr(desc, CAT_CHR)) != NULL) {
+       tok[0] = '\0';
+       tok++;
 
-#undef GET_MOD
+       if (strcmp("tiled", tok) == 0) {
+           sel->tiled = OPTION_TRUE;
+       } else if (tok[0] == '!' && strcmp("tiled", tok + 1) == 0) {
+           sel->tiled = OPTION_FALSE;
+       }
+       else PARSE_MODIFIER(node, automatic)
+       else PARSE_MODIFIER(node, focused)
+       else PARSE_MODIFIER(node, active)
+       else PARSE_MODIFIER(node, local)
+       else PARSE_MODIFIER(node, leaf)
+       else PARSE_MODIFIER(node, window)
+       else PARSE_MODIFIER(node, pseudo_tiled)
+       else PARSE_MODIFIER(node, floating)
+       else PARSE_MODIFIER(node, fullscreen)
+       else PARSE_MODIFIER(node, hidden)
+       else PARSE_MODIFIER(node, sticky)
+       else PARSE_MODIFIER(node, private)
+       else PARSE_MODIFIER(node, locked)
+       else PARSE_MODIFIER(node, marked)
+       else PARSE_MODIFIER(node, urgent)
+       else PARSE_MODIFIER(node, same_class)
+       else PARSE_MODIFIER(node, descendant_of)
+       else PARSE_MODIFIER(node, ancestor_of)
+       else PARSE_MODIFIER(node, below)
+       else PARSE_MODIFIER(node, normal)
+       else PARSE_MODIFIER(node, above)
+       else PARSE_MODIFIER(node, horizontal)
+       else PARSE_MODIFIER(node, vertical)
+       else {
+           return false;
+       }
+   }
+   return true;
+}
