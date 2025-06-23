@@ -1,18 +1,23 @@
-# From 0.9.9 to 0.9.10
+# From 0.10.1 to 0.10.2
 
-## Additions
-
-- New node descriptor: `first_ancestor`.
-- New node modifiers: `horizontal`, `vertical`.
-
-## Changes
-
-- The node descriptors `next` and `prev` might now return any node. The previous behavior can be emulated by appending `.!hidden.window`.
-- The node descriptors `pointed`, `biggest` and `smallest` now return leaves (in particular `pointed` will now return the *id* of a pointed receptacle). The previous behavior can be emulated by appending `.window`.
-- The *query* command now handles all the possible descriptor-free constraints (for example, `query -N -d .active` now works as expected).
-- The rules can now match against the window's names (`WM_NAME`).
-- The configuration script now receives an argument to indicate whether is was executed after a restart or not.
-- The *intermediate consequences* passed to the external rules command are now in resolved form to avoid unwanted code execution.
+- Fix buffer overflow vulnerability in `make_monitor()` using `strncpy` with explicit null termination.
+- Fix integer overflow vulnerabilities in `monitor_from_client()` when calculating center coordinates.
+- Fix integer overflow vulnerabilities in `adapt_geometry()` using safe arithmetic macros for all coordinate calculations.
+- Fix potential stack overflow from VLA in `update_monitors()` by validating monitor count against `MAX_MONITORS` limit.
+- Fix integer overflow in `embrace_client()` when adjusting window positions to fit monitor bounds.
+- Fix memory leak in `update_monitors()` by ensuring all allocated structures are properly freed.
+- Fix null pointer dereferences throughout monitor operations with consistent validation.
+- Fix unsafe `copy_string()` usage in `update_monitors()` by using stack allocation with bounds checking.
+- Add `SAFE_ADD()` and `SAFE_SUB()` macros to prevent integer overflow in arithmetic operations.
+- Add `batch_ewmh_update()` helper to reduce X11 round trips when updating EWMH properties.
+- Add null checks in `is_inside_monitor()`, `rename_monitor()`, and all monitor finding functions.
+- Add proper bounds validation for monitor names to prevent buffer overflows.
+- Optimize `monitor_from_client()` distance calculation using unsigned arithmetic without `abs()`.
+- Optimize monitor list operations by simplifying control flow and removing redundant conditions.
+- Optimize `update_monitors()` to use fixed-size cookie array instead of VLA.
+- Use `int64_t` for intermediate calculations in `adapt_geometry()` to prevent overflow.
+- Ensure minimum window dimensions of 1x1 in `adapt_geometry()` to prevent invalid rectangles.
+- Validate rectangle dimensions before performing scaling calculations in window positioning.
 
 # From 0.10.0 to 0.10.1
 
@@ -34,7 +39,7 @@
 - Use branchless comparison in `rect_cmp()` final area comparison for better performance.
 - Simplify `find_closest_desktop()` by removing macro and using inline loop logic.
 
-# From 0.9.9 to 0.10.0
+# From 0.9.10 to 0.10.0
 
 - Fix multiple buffer overflow vulnerabilities in `read_string`, `copy_string`, and `tokenize_with_escape`.
 - Fix potential integer overflows in string allocation with proper bounds checking.
@@ -64,6 +69,22 @@
 - Add input validation throughout the codebase for all user-provided data.
 - Add GitHub Actions workflow for automated binary releases.
 - Add Nix shell configuration for reproducible development environment.
+
+# From 0.9.9 to 0.9.10
+
+## Additions
+
+- New node descriptor: `first_ancestor`.
+- New node modifiers: `horizontal`, `vertical`.
+
+## Changes
+
+- The node descriptors `next` and `prev` might now return any node. The previous behavior can be emulated by appending `.!hidden.window`.
+- The node descriptors `pointed`, `biggest` and `smallest` now return leaves (in particular `pointed` will now return the *id* of a pointed receptacle). The previous behavior can be emulated by appending `.window`.
+- The *query* command now handles all the possible descriptor-free constraints (for example, `query -N -d .active` now works as expected).
+- The rules can now match against the window's names (`WM_NAME`).
+- The configuration script now receives an argument to indicate whether is was executed after a restart or not.
+- The *intermediate consequences* passed to the external rules command are now in resolved form to avoid unwanted code execution.
 
 # From 0.9.8 to 0.9.9
 
