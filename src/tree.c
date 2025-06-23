@@ -1633,7 +1633,7 @@ bool transfer_node(monitor_t *ms, desktop_t *ds, node_t *ns, monitor_t *md, desk
 	}
 
 	unsigned int sc = (ms->sticky_count > 0 && ds == ms->desk) ? sticky_count(ns) : 0;
-	if (sticky_still && sc > 0 && dd != md->desk) {
+	if (sticky_still if (sticky_still && sc > 0 && dd != md->desk) {if (sticky_still && sc > 0 && dd != md->desk) { sc > 0 if (sticky_still && sc > 0 && dd != md->desk) {if (sticky_still && sc > 0 && dd != md->desk) { dd != NULL if (sticky_still && sc > 0 && dd != md->desk) {if (sticky_still && sc > 0 && dd != md->desk) { dd != md->desk) {
 		return false;
 	}
 
