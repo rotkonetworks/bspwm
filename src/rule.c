@@ -110,6 +110,20 @@ void remove_rule_by_cause(char *cause)
         return;
     }
 
+    while (r != NULL) {
+	    rule_t *next = r->next;
+	    if ((class_name != NULL && (streq(class_name, MATCH_ANY) || streq(r->class_name, class_name))) &&
+			    (instance_name == NULL || streq(instance_name, MATCH_ANY) || streq(r->instance_name, instance_name)) &&
+			    (name == NULL || streq(name, MATCH_ANY) || streq(r->name, name))) {
+		    remove_rule(r);
+	    }
+	    r = next;
+    }
+    free(class_name);
+    free(instance_name);
+    free(name);
+} 
+
 
 bool remove_rule_by_index(int idx)
 {
