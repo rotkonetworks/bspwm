@@ -21,7 +21,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,10 +36,14 @@
 
 #define MAX_RECURSION_DEPTH 1000
 
+static void query_node_depth(node_t *n, FILE *rsp, int depth);
+static int query_node_ids_in_depth(node_t *n, desktop_t *d, monitor_t *m, coordinates_t *ref,
+                                   coordinates_t *trg, node_select_t *sel, FILE *rsp, int depth);
+
 void query_state(FILE *rsp)
 {
 	if (!rsp) return;
-
+	
 	fprintf(rsp, "{");
 	fprintf(rsp, "\"focusedMonitorId\":%u,", mon ? mon->id : 0);
 	if (pri_mon) {
@@ -73,7 +76,7 @@ void query_state(FILE *rsp)
 void query_monitor(monitor_t *m, FILE *rsp)
 {
 	if (!m || !rsp) return;
-
+	
 	fprintf(rsp, "{");
 	fprintf(rsp, "\"name\":\"%s\",", m->name);
 	fprintf(rsp, "\"id\":%u,", m->id);
@@ -104,7 +107,7 @@ void query_monitor(monitor_t *m, FILE *rsp)
 void query_desktop(desktop_t *d, FILE *rsp)
 {
 	if (!d || !rsp) return;
-
+	
 	fprintf(rsp, "{");
 	fprintf(rsp, "\"name\":\"%s\",", d->name);
 	fprintf(rsp, "\"id\":%u,", d->id);
@@ -127,7 +130,7 @@ static void query_node_depth(node_t *n, FILE *rsp, int depth)
 		fprintf(rsp, "null");
 		return;
 	}
-
+	
 	if (!n) {
 		fprintf(rsp, "null");
 	} else {
@@ -170,11 +173,11 @@ void query_node(node_t *n, FILE *rsp)
 void query_presel(presel_t *p, FILE *rsp)
 {
 	if (!rsp) return;
-
+	
 	if (!p) {
 		fprintf(rsp, "null");
 	} else {
-		fprintf(rsp, "{\"splitDir\":\"%s\",\"splitRatio\":%lf}",
+		fprintf(rsp, "{\"splitDir\":\"%s\",\"splitRatio\":%lf}", 
 		        SPLIT_DIR_STR(p->split_dir), p->split_ratio);
 	}
 }
@@ -182,7 +185,7 @@ void query_presel(presel_t *p, FILE *rsp)
 void query_client(client_t *c, FILE *rsp)
 {
 	if (!rsp) return;
-
+	
 	if (!c) {
 		fprintf(rsp, "null");
 	} else {
@@ -226,7 +229,7 @@ void query_padding(padding_t p, FILE *rsp)
 void query_history(FILE *rsp)
 {
 	if (!rsp) return;
-
+	
 	fprintf(rsp, "[");
 	for (history_t *h = history_head; h; h = h->next) {
 		query_coordinates(&h->loc, rsp);
@@ -240,8 +243,8 @@ void query_history(FILE *rsp)
 void query_coordinates(coordinates_t *loc, FILE *rsp)
 {
 	if (!loc || !rsp) return;
-
-	fprintf(rsp, "{\"monitorId\":%u,\"desktopId\":%u,\"nodeId\":%u}",
+	
+	fprintf(rsp, "{\"monitorId\":%u,\"desktopId\":%u,\"nodeId\":%u}", 
 	        loc->monitor ? loc->monitor->id : 0,
 	        loc->desktop ? loc->desktop->id : 0,
 	        loc->node ? loc->node->id : 0);
@@ -250,7 +253,7 @@ void query_coordinates(coordinates_t *loc, FILE *rsp)
 void query_stack(FILE *rsp)
 {
 	if (!rsp) return;
-
+	
 	fprintf(rsp, "[");
 	for (stacking_list_t *s = stack_head; s; s = s->next) {
 		if (s->node)
@@ -265,7 +268,7 @@ void query_stack(FILE *rsp)
 void query_subscribers(FILE *rsp)
 {
 	if (!rsp) return;
-
+	
 	fprintf(rsp, "[");
 	for (subscriber_list_t *s = subscribe_head; s; s = s->next) {
 		fprintf(rsp, "{\"fileDescriptor\": %i", s->stream ? fileno(s->stream) : -1);
@@ -280,12 +283,12 @@ void query_subscribers(FILE *rsp)
 	fprintf(rsp, "]");
 }
 
-int query_node_ids(coordinates_t *mon_ref, coordinates_t *desk_ref, coordinates_t* ref,
-                   coordinates_t *trg, monitor_select_t *mon_sel, desktop_select_t *desk_sel,
+int query_node_ids(coordinates_t *mon_ref, coordinates_t *desk_ref, coordinates_t* ref, 
+                   coordinates_t *trg, monitor_select_t *mon_sel, desktop_select_t *desk_sel, 
                    node_select_t *sel, FILE *rsp)
 {
 	if (!rsp) return 0;
-
+	
 	int count = 0;
 	for (monitor_t *m = mon_head; m; m = m->next) {
 		coordinates_t loc = {m, NULL, NULL};
@@ -310,7 +313,7 @@ static int query_node_ids_in_depth(node_t *n, desktop_t *d, monitor_t *m, coordi
 {
 	if (depth > MAX_RECURSION_DEPTH || !n || !rsp)
 		return 0;
-
+		
 	int count = 0;
 	coordinates_t loc = {m, d, n};
 	if ((!trg || !trg->node || n == trg->node) &&
@@ -320,7 +323,7 @@ static int query_node_ids_in_depth(node_t *n, desktop_t *d, monitor_t *m, coordi
 	}
 	count += query_node_ids_in_depth(n->first_child, d, m, ref, trg, sel, rsp, depth + 1);
 	count += query_node_ids_in_depth(n->second_child, d, m, ref, trg, sel, rsp, depth + 1);
-
+	
 	return count;
 }
 
@@ -331,11 +334,11 @@ int query_node_ids_in(node_t *n, desktop_t *d, monitor_t *m, coordinates_t *ref,
 }
 
 int query_desktop_ids(coordinates_t* mon_ref, coordinates_t *ref, coordinates_t *trg,
-                      monitor_select_t *mon_sel, desktop_select_t *sel,
+                      monitor_select_t *mon_sel, desktop_select_t *sel, 
                       desktop_printer_t printer, FILE *rsp)
 {
 	if (!rsp || !printer) return 0;
-
+	
 	int count = 0;
 	for (monitor_t *m = mon_head; m; m = m->next) {
 		coordinates_t loc = {m, NULL, NULL};
@@ -360,7 +363,7 @@ int query_monitor_ids(coordinates_t *ref, coordinates_t *trg, monitor_select_t *
                       monitor_printer_t printer, FILE *rsp)
 {
 	if (!rsp || !printer) return 0;
-
+	
 	int count = 0;
 	for (monitor_t *m = mon_head; m; m = m->next) {
 		coordinates_t loc = {m, NULL, NULL};
@@ -401,7 +404,7 @@ void fprint_desktop_name(desktop_t *d, FILE *rsp)
 void print_ignore_request(state_transition_t st, FILE *rsp)
 {
 	if (!rsp) return;
-
+	
 	if (st == 0) {
 		fprintf(rsp, "none");
 	} else {
@@ -419,7 +422,7 @@ void print_ignore_request(state_transition_t st, FILE *rsp)
 void print_modifier_mask(uint16_t m, FILE *rsp)
 {
 	if (!rsp) return;
-
+	
 	switch (m) {
 		case XCB_MOD_MASK_SHIFT:
 			fprintf(rsp, "shift");
@@ -451,7 +454,7 @@ void print_modifier_mask(uint16_t m, FILE *rsp)
 void print_button_index(int8_t b, FILE *rsp)
 {
 	if (!rsp) return;
-
+	
 	switch (b) {
 		case XCB_BUTTON_INDEX_ANY:
 			fprintf(rsp, "any");
@@ -474,7 +477,7 @@ void print_button_index(int8_t b, FILE *rsp)
 void print_pointer_action(pointer_action_t a, FILE *rsp)
 {
 	if (!rsp) return;
-
+	
 	switch (a) {
 		case ACTION_MOVE:
 			fprintf(rsp, "move");
@@ -497,7 +500,7 @@ void print_pointer_action(pointer_action_t a, FILE *rsp)
 void resolve_rule_consequence(rule_consequence_t *csq)
 {
 	if (!csq) return;
-
+	
 	coordinates_t ref = {mon, mon ? mon->desk : NULL, mon && mon->desk ? mon->desk->focus : NULL};
 	coordinates_t dst = {NULL, NULL, NULL};
 	monitor_t *monitor = monitor_from_desc(csq->monitor_desc, &ref, &dst) != SELECTOR_OK ? NULL : dst.monitor;
@@ -519,7 +522,7 @@ void resolve_rule_consequence(rule_consequence_t *csq)
 void print_rule_consequence(char **buf, rule_consequence_t *csq)
 {
 	if (!buf || !csq) return;
-
+	
 	char *rect_buf = NULL;
 	print_rectangle(&rect_buf, csq->rect);
 	if (!rect_buf) {
@@ -540,9 +543,9 @@ void print_rule_consequence(char **buf, rule_consequence_t *csq)
 	        ON_OFF_STR(csq->locked), ON_OFF_STR(csq->marked), ON_OFF_STR(csq->center),
 	        ON_OFF_STR(csq->follow), ON_OFF_STR(csq->manage), ON_OFF_STR(csq->focus),
 	        ON_OFF_STR(csq->border), rect_buf ? rect_buf : "");
-
+	
 	free(rect_buf);
-
+	
 	if (ret < 0)
 		*buf = NULL;
 }
@@ -550,7 +553,7 @@ void print_rule_consequence(char **buf, rule_consequence_t *csq)
 void print_rectangle(char **buf, xcb_rectangle_t *rect)
 {
 	if (!buf) return;
-
+	
 	if (rect) {
 		if (asprintf(buf, "%hux%hu+%hi+%hi", rect->width, rect->height, rect->x, rect->y) < 0)
 			*buf = NULL;
@@ -619,7 +622,7 @@ int node_from_desc(char *desc, coordinates_t *ref, coordinates_t *dst)
 {
 	if (!desc || !ref || !dst)
 		return SELECTOR_BAD_DESCRIPTOR;
-
+		
 	if (strlen(desc) > MAXLEN)
 		return SELECTOR_BAD_DESCRIPTOR;
 
@@ -647,7 +650,7 @@ int node_from_desc(char *desc, coordinates_t *ref, coordinates_t *dst)
 	if (hash) {
 		*hash = '\0';
 		int ret;
-		coordinates_t tmp = {mon, mon ? mon->desk : NULL,
+		coordinates_t tmp = {mon, mon ? mon->desk : NULL, 
 		                    mon && mon->desk ? mon->desk->focus : NULL};
 		if ((ret = node_from_desc(desc, &tmp, ref)) == SELECTOR_OK) {
 			desc = hash + 1;
@@ -696,7 +699,7 @@ int node_from_desc(char *desc, coordinates_t *ref, coordinates_t *dst)
 			return SELECTOR_INVALID;
 		}
 	} else if (streq("focused", desc)) {
-		coordinates_t loc = {mon, mon ? mon->desk : NULL,
+		coordinates_t loc = {mon, mon ? mon->desk : NULL, 
 		                    mon && mon->desk ? mon->desk->focus : NULL};
 		if (node_matches(&loc, ref, &sel)) {
 			*dst = loc;
@@ -771,7 +774,7 @@ int desktop_from_desc(char *desc, coordinates_t *ref, coordinates_t *dst)
 {
 	if (!desc || !ref || !dst)
 		return SELECTOR_BAD_DESCRIPTOR;
-
+		
 	if (strlen(desc) > MAXLEN)
 		return SELECTOR_BAD_DESCRIPTOR;
 
@@ -841,7 +844,7 @@ int desktop_from_desc(char *desc, coordinates_t *ref, coordinates_t *dst)
 		int ret;
 		if ((ret = monitor_from_desc(desc, ref, dst)) == SELECTOR_OK) {
 			if (streq("focused", colon + 1)) {
-				coordinates_t loc = {dst->monitor,
+				coordinates_t loc = {dst->monitor, 
 				                    dst->monitor ? dst->monitor->desk : NULL, NULL};
 				if (desktop_matches(&loc, ref, &sel)) {
 					*dst = loc;
@@ -895,7 +898,7 @@ int monitor_from_desc(char *desc, coordinates_t *ref, coordinates_t *dst)
 {
 	if (!desc || !ref || !dst)
 		return SELECTOR_BAD_DESCRIPTOR;
-
+		
 	if (strlen(desc) > MAXLEN)
 		return SELECTOR_BAD_DESCRIPTOR;
 
@@ -1005,7 +1008,7 @@ end:
 bool locate_leaf(xcb_window_t win, coordinates_t *loc)
 {
 	if (!loc) return false;
-
+	
 	for (monitor_t *m = mon_head; m; m = m->next) {
 		for (desktop_t *d = m->desk_head; d; d = d->next) {
 			for (node_t *n = first_extrema(d->root); n; n = next_leaf(n, d->root)) {
@@ -1024,7 +1027,7 @@ bool locate_leaf(xcb_window_t win, coordinates_t *loc)
 bool locate_window(xcb_window_t win, coordinates_t *loc)
 {
 	if (!loc) return false;
-
+	
 	for (monitor_t *m = mon_head; m; m = m->next) {
 		for (desktop_t *d = m->desk_head; d; d = d->next) {
 			for (node_t *n = first_extrema(d->root); n; n = next_leaf(n, d->root)) {
@@ -1045,7 +1048,7 @@ bool locate_window(xcb_window_t win, coordinates_t *loc)
 bool locate_desktop(char *name, coordinates_t *loc)
 {
 	if (!name || !loc) return false;
-
+	
 	for (monitor_t *m = mon_head; m; m = m->next) {
 		for (desktop_t *d = m->desk_head; d; d = d->next) {
 			if (streq(d->name, name)) {
@@ -1061,7 +1064,7 @@ bool locate_desktop(char *name, coordinates_t *loc)
 bool locate_monitor(char *name, coordinates_t *loc)
 {
 	if (!name || !loc) return false;
-
+	
 	for (monitor_t *m = mon_head; m; m = m->next) {
 		if (streq(m->name, name)) {
 			loc->monitor = m;
@@ -1074,7 +1077,7 @@ bool locate_monitor(char *name, coordinates_t *loc)
 bool desktop_from_id(uint32_t id, coordinates_t *loc, monitor_t *mm)
 {
 	if (!loc) return false;
-
+	
 	for (monitor_t *m = mon_head; m; m = m->next) {
 		if (mm && m != mm)
 			continue;
@@ -1090,11 +1093,11 @@ bool desktop_from_id(uint32_t id, coordinates_t *loc, monitor_t *mm)
 	return false;
 }
 
-bool desktop_from_name(char *name, coordinates_t *ref, coordinates_t *dst,
+bool desktop_from_name(char *name, coordinates_t *ref, coordinates_t *dst, 
                        desktop_select_t *sel, int *hits)
 {
 	if (!name || !dst) return false;
-
+	
 	for (monitor_t *m = mon_head; m; m = m->next) {
 		for (desktop_t *d = m->desk_head; d; d = d->next) {
 			if (streq(d->name, name)) {
@@ -1115,7 +1118,7 @@ bool desktop_from_name(char *name, coordinates_t *ref, coordinates_t *dst,
 bool desktop_from_index(uint16_t idx, coordinates_t *loc, monitor_t *mm)
 {
 	if (!loc || idx == 0) return false;
-
+	
 	for (monitor_t *m = mon_head; m; m = m->next) {
 		if (mm && m != mm)
 			continue;
@@ -1134,7 +1137,7 @@ bool desktop_from_index(uint16_t idx, coordinates_t *loc, monitor_t *mm)
 bool monitor_from_id(uint32_t id, coordinates_t *loc)
 {
 	if (!loc) return false;
-
+	
 	for (monitor_t *m = mon_head; m; m = m->next) {
 		if (m->id == id) {
 			loc->monitor = m;
@@ -1149,7 +1152,7 @@ bool monitor_from_id(uint32_t id, coordinates_t *loc)
 bool monitor_from_index(int idx, coordinates_t *loc)
 {
 	if (!loc || idx <= 0) return false;
-
+	
 	for (monitor_t *m = mon_head; m; m = m->next, idx--) {
 		if (idx == 1) {
 			loc->monitor = m;
@@ -1349,7 +1352,7 @@ bool desktop_matches(coordinates_t *loc, coordinates_t *ref, desktop_select_t *s
 	}
 
 	if (sel->local != OPTION_NONE &&
-	    (ref && ref->monitor) != loc->monitor
+	    loc->monitor != (ref && ref->monitor ? ref->monitor : NULL)
 	    ? sel->local == OPTION_TRUE
 	    : sel->local == OPTION_FALSE) {
 		return false;
