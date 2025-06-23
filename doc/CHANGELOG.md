@@ -14,6 +14,25 @@
 - The configuration script now receives an argument to indicate whether is was executed after a restart or not.
 - The *intermediate consequences* passed to the external rules command are now in resolved form to avoid unwanted code execution.
 
+# From 0.10.0 to 0.10.1
+
+- Fix integer overflow vulnerabilities in `area()` and `boundary_distance()` geometry calculations.
+- Fix buffer overflow vulnerabilities in `make_desktop()` and `rename_desktop()` using `strncpy` with explicit null termination.
+- Fix memory leak in `swap_desktops()` by removing duplicate free operations on sticky desktop structures.
+- Fix null pointer dereferences throughout desktop operations by adding consistent validation at function entry.
+- Fix signed/unsigned comparison warning in `parse_rule_consequence()` by casting to `size_t`.
+- Fix coordinate overflow vulnerabilities in `valid_rect()` by checking INT16_MAX boundaries.
+- Fix potential crashes in `rect_cmp()` and other geometry functions by validating rectangle dimensions.
+- Add `urgent_count` field to `desktop_t` structure for O(1) urgent window checking instead of O(n) tree traversal.
+- Add `batch_ewmh_update()` helper to reduce X11 round trips by consolidating multiple EWMH updates.
+- Add `rect_max()` helper to cache maximum point calculations and reduce redundant arithmetic.
+- Add comprehensive bounds checking in geometry operations to prevent integer wraparound.
+- Optimize `on_dir_side()` overlap checks using direct interval tests instead of multiple conditions.
+- Optimize desktop finding operations by removing redundant null checks and simplifying control flow.
+- Optimize linked list operations in `unlink_desktop()` and `insert_desktop()`.
+- Replace verbose null checks with concise early returns throughout the codebase.
+- Use branchless comparison in `rect_cmp()` final area comparison for better performance.
+- Simplify `find_closest_desktop()` by removing macro and using inline loop logic.
 
 # From 0.9.9 to 0.10.0
 
