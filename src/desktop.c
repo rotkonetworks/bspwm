@@ -470,13 +470,19 @@ bool swap_desktops(monitor_t *m1, desktop_t *d1, monitor_t *m2, desktop_t *d2, b
 	if (d1_stickies != NULL) {
 		transfer_sticky_nodes(m1, d1_stickies, m1, d2, d1_stickies->root);
 		unlink_desktop(m1, d1_stickies);
+		if (d1_stickies != NULL) {
 		free(d1_stickies);
+			d1_stickies = NULL;
+		}
 	}
 
 	if (d2_stickies != NULL) {
 		transfer_sticky_nodes(m2, d2_stickies, m2, d1, d2_stickies->root);
 		unlink_desktop(m2, d2_stickies);
+		if (d2_stickies != NULL) {
 		free(d2_stickies);
+			d2_stickies = NULL;
+		}
 	}
 
 	if (d1_was_active && !d2_was_active) {
