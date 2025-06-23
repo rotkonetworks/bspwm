@@ -7,14 +7,18 @@
 
 bool parse_bool(char *value, bool *b)
 {
-	if (streq("true", value) || streq("on", value)) {
-		*b = true;
-		return true;
-	} else if (streq("false", value) || streq("off", value)) {
-		*b = false;
-		return true;
-	}
-	return false;
+    if (value == NULL || strlen(value) > 10) {  // "false" is 5 chars, be generous
+        return false;
+    }
+
+    if (streq("true", value) || streq("on", value)) {
+        *b = true;
+        return true;
+    } else if (streq("false", value) || streq("off", value)) {
+        *b = false;
+        return true;
+    }
+    return false;
 }
 
 bool parse_split_type(char *s, split_type_t *t)
