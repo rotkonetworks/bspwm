@@ -55,46 +55,65 @@ void pointer_init(void)
 	grabbed_node = NULL;
 }
 
-void window_grab_buttons(xcb_window_t win)
-{
-	for (unsigned int i = 0; i < LENGTH(BUTTONS); i++) {
-		if (click_to_focus == (int8_t) XCB_BUTTON_INDEX_ANY || click_to_focus == (int8_t) BUTTONS[i]) {
-			window_grab_button(win, BUTTONS[i], XCB_NONE);
-		}
-		if (pointer_actions[i] != ACTION_NONE) {
-			window_grab_button(win, BUTTONS[i], pointer_modifier);
-		}
-	}
-}
-
 void window_grab_button(xcb_window_t win, uint8_t button, uint16_t modifier)
 {
+    xcb_void_cookie_t cookies[8];
+    int cookie_count = 0;
+
 #define GRAB(b, m) \
-	xcb_grab_button(dpy, false, win, XCB_EVENT_MASK_BUTTON_PRESS, \
-	                XCB_GRAB_MODE_SYNC, XCB_GRAB_MODE_ASYNC, XCB_NONE, XCB_NONE, b, m)
-		GRAB(button, modifier);
-		if (num_lock != XCB_NO_SYMBOL && caps_lock != XCB_NO_SYMBOL && scroll_lock != XCB_NO_SYMBOL) {
-			GRAB(button, modifier | num_lock | caps_lock | scroll_lock);
-		}
-		if (num_lock != XCB_NO_SYMBOL && caps_lock != XCB_NO_SYMBOL) {
-			GRAB(button, modifier | num_lock | caps_lock);
-		}
-		if (caps_lock != XCB_NO_SYMBOL && scroll_lock != XCB_NO_SYMBOL) {
-			GRAB(button, modifier | caps_lock | scroll_lock);
-		}
-		if (num_lock != XCB_NO_SYMBOL && scroll_lock != XCB_NO_SYMBOL) {
-			GRAB(button, modifier | num_lock | scroll_lock);
-		}
-		if (num_lock != XCB_NO_SYMBOL) {
-			GRAB(button, modifier | num_lock);
-		}
-		if (caps_lock != XCB_NO_SYMBOL) {
-			GRAB(button, modifier | caps_lock);
-		}
-		if (scroll_lock != XCB_NO_SYMBOL) {
-			GRAB(button, modifier | scroll_lock);
-		}
+    cookies[cookie_count++] = xcb_grab_button_checked(dpy, false, win, XCB_EVENT_MASK_BUTTON_PRESS, \
+                                                      XCB_GRAB_MODE_SYNC, XCB_GRAB_MODE_ASYNC, XCB_NONE, XCB_NONE, b, m)
+
+    GRAB(button, modifier);
+    if (num_lock != XCB_NO_SYMBOL && caps_lock != XCB_NO_SYMBOL && scroll_lock != XCB_NO_SYMBOL) {
+        GRAB(button, modifier | num_lock | caps_lock | scroll_lock);
+    }
+    if (num_lock != XCB_NO_SYMBOL && caps_lock != XCB_NO_SYMBOL) {
+        GRAB(button, modifier | num_lock | caps_lock);
+    }
+    if (caps_lock != XCB_NO_SYMBOL && scroll_lock != XCB_NO_SYMBOL) {
+        GRAB(button, modifier | caps_lock | scroll_lock);
+    }
+    if (num_lock != XCB_NO_SYMBOL && scroll_lock != XCB_NO_SYMBOL) {
+        GRAB(button, modifier | num_lock | scroll_lock);
+    }
+    if (num_lock != XCB_NO_SYMBOL) {
+        GRAB(button, modifier | num_lock);
+    }
+    if (caps_lock != XCB_NO_SYMBOL) {
+        GRAB(button, modifier | caps_lock);
+    }
+    if (scroll_lock != XCB_NO_SYMBOL) {
+        GRAB(button, modifier | scroll_lock);
+    }
 #undef GRAB
+
+    for (int i = 0; i < cookie_count; i++) {
+        xcb_generic_error_t *err = xcb_request_check(dpy, cookies[i]);
+        if (err != NULL) {
+            free(err);
+            return;
+        }
+    }
+}
+
+void window_grab_buttons(xcb_window_t win)
+{
+    xcb_void_cookie_t test_cookie = xcb_change_window_attributes_checked(dpy, win, 0, NULL);
+    xcb_generic_error_t *err = xcb_request_check(dpy, test_cookie);
+    if (err != NULL) {
+        free(err);
+        return;
+    }
+
+    for (unsigned int i = 0; i < LENGTH(BUTTONS); i++) {
+        if (click_to_focus == (int8_t) XCB_BUTTON_INDEX_ANY || click_to_focus == (int8_t) BUTTONS[i]) {
+            window_grab_button(win, BUTTONS[i], XCB_NONE);
+        }
+        if (pointer_actions[i] != ACTION_NONE) {
+            window_grab_button(win, BUTTONS[i], pointer_modifier);
+        }
+    }
 }
 
 void grab_buttons(void)
