@@ -84,8 +84,8 @@ extern bool auto_raise;
 extern bool sticky_still;
 extern bool hide_sticky;
 extern bool record_history;
-extern bool running;
-extern bool restart;
+extern volatile bool running;
+extern volatile bool restart;
 extern bool randr;
 
 void init(void);
