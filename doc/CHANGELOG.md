@@ -14,6 +14,38 @@
 - The configuration script now receives an argument to indicate whether is was executed after a restart or not.
 - The *intermediate consequences* passed to the external rules command are now in resolved form to avoid unwanted code execution.
 
+
+# From 0.9.9 to 0.10.0
+
+- Fix multiple buffer overflow vulnerabilities in `read_string`, `copy_string`, and `tokenize_with_escape`.
+- Fix potential integer overflows in string allocation with proper bounds checking.
+- Fix stack overflow vulnerabilities in all recursive functions by adding `MAX_TREE_DEPTH` limits.
+- Fix race conditions in signal handling by marking `running` and `restart` as volatile.
+- Fix null pointer dereferences in `remove_desktop`, `swap_desktops`, `swap_nodes`, and tree operations.
+- Fix window button grabbing by validating window existence before XCB calls.
+- Fix memory leaks in `swap_desktops` by properly freeing temporary sticky desktop structures.
+- Fix integer overflows in constraint calculations using `SAFE_ADD` and `SAFE_SUB` macros.
+- Fix coordinate overflows in `arrange` and `apply_layout` functions.
+- Fix node swapping validation to prevent parent-child swaps and verify node existence.
+- Fix focus handling during node transfers to prevent focusing destroyed nodes.
+- Fix sticky node transfer edge cases between desktops.
+- Fix split ratio calculations to handle zero width/height rectangles.
+- Fix tree balancing division by zero in `balance_tree`.
+- Fix `adjust_ratios` to handle empty rectangles without crashing.
+- Fix rule parsing buffer overflows in `parse_keys_values` and `remove_rule_by_cause`.
+- Fix `parse_rule_consequence` buffer handling for large inputs.
+- Fix `parse_bool` to validate input length.
+- Fix file descriptor handling in `subscribe.c` for restart scenarios.
+- Fix potential use-after-free in node operations by zeroing memory in `free_node`.
+- Fix constraint propagation to handle node addition overflow.
+- Fix hidden/vacant flag propagation edge cases.
+- Fix presel feedback window cleanup during node swaps.
+- Fix focus history corruption during complex node operations.
+- Add `MAX_STRING_SIZE` limit (1MB) to prevent excessive memory allocation.
+- Add input validation throughout the codebase for all user-provided data.
+- Add GitHub Actions workflow for automated binary releases.
+- Add Nix shell configuration for reproducible development environment.
+
 # From 0.9.8 to 0.9.9
 
 - Fix a memory allocation bug in the implementation of `wm --restart`.
