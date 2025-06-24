@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 #include "bspwm.h"
 #include "settings.h"
 #include "tree.h"
@@ -36,7 +37,12 @@ xcb_ewmh_connection_t *ewmh;
 void ewmh_init(void)
 {
 	ewmh = calloc(1, sizeof(xcb_ewmh_connection_t));
+	if (ewmh == NULL) {
+		err("Can't allocate EWMH connection.\n");
+	}
 	if (xcb_ewmh_init_atoms_replies(ewmh, xcb_ewmh_init_atoms(dpy, ewmh), NULL) == 0) {
+		free(ewmh);
+		ewmh = NULL;
 		err("Can't initialize EWMH atoms.\n");
 	}
 }
@@ -125,30 +131,54 @@ void ewmh_update_wm_desktops(void)
 
 void ewmh_update_desktop_names(void)
 {
-	char names[MAXLEN];
-	unsigned int i, j;
-	uint32_t names_len;
-	i = 0;
+	char *names = NULL;
+	size_t names_size = 0;
+	size_t names_capacity = MAXLEN;
+	size_t current_pos = 0;
 
-	for (monitor_t *m = mon_head; m != NULL; m = m->next) {
-		for (desktop_t *d = m->desk_head; d != NULL; d = d->next) {
-			for (j = 0; d->name[j] != '\0' && (i + j) < sizeof(names); j++) {
-				names[i + j] = d->name[j];
-			}
-			i += j;
-			if (i < sizeof(names)) {
-				names[i++] = '\0';
-			}
-		}
-	}
-
-	if (i < 1) {
+	names = malloc(names_capacity);
+	if (names == NULL) {
 		xcb_ewmh_set_desktop_names(ewmh, default_screen, 0, NULL);
 		return;
 	}
 
-	names_len = i - 1;
-	xcb_ewmh_set_desktop_names(ewmh, default_screen, names_len, names);
+	for (monitor_t *m = mon_head; m != NULL; m = m->next) {
+		for (desktop_t *d = m->desk_head; d != NULL; d = d->next) {
+			size_t name_len = strlen(d->name);
+
+			/* +1 for null terminator */
+			while (current_pos + name_len + 1 > names_capacity) {
+				size_t new_capacity = names_capacity * 2;
+				if (new_capacity > INT_MAX) {
+					free(names);
+					xcb_ewmh_set_desktop_names(ewmh, default_screen, 0, NULL);
+					return;
+				}
+				char *new_names = realloc(names, new_capacity);
+				if (new_names == NULL) {
+					free(names);
+					xcb_ewmh_set_desktop_names(ewmh, default_screen, 0, NULL);
+					return;
+				}
+				names = new_names;
+				names_capacity = new_capacity;
+			}
+
+			memcpy(names + current_pos, d->name, name_len);
+			current_pos += name_len;
+			names[current_pos++] = '\0';
+			names_size = current_pos;
+		}
+	}
+
+	if (names_size > 0) {
+		names_size--; /* Don't count the final null */
+		xcb_ewmh_set_desktop_names(ewmh, default_screen, names_size, names);
+	} else {
+		xcb_ewmh_set_desktop_names(ewmh, default_screen, 0, NULL);
+	}
+
+	free(names);
 }
 
 void ewmh_update_desktop_viewport(void)
@@ -163,7 +193,10 @@ void ewmh_update_desktop_viewport(void)
 		xcb_ewmh_set_desktop_viewport(ewmh, default_screen, 0, NULL);
 		return;
 	}
-	xcb_ewmh_coordinates_t coords[desktops_count];
+	xcb_ewmh_coordinates_t *coords = calloc(desktops_count, sizeof(xcb_ewmh_coordinates_t));
+	if (coords == NULL) {
+		return;
+	}
 	uint16_t desktop = 0;
 	for (monitor_t *m = mon_head; m != NULL; m = m->next) {
 		for (desktop_t *d = m->desk_head; d != NULL; d = d->next) {
@@ -171,6 +204,7 @@ void ewmh_update_desktop_viewport(void)
 		}
 	}
 	xcb_ewmh_set_desktop_viewport(ewmh, default_screen, desktop, coords);
+	free(coords);
 }
 
 bool ewmh_handle_struts(xcb_window_t win)
@@ -241,7 +275,11 @@ void ewmh_update_client_list(bool stacking)
 		return;
 	}
 
-	xcb_window_t wins[clients_count];
+	xcb_window_t *wins = calloc(clients_count, sizeof(xcb_window_t));
+	if (wins == NULL) {
+		return;
+	}
+
 	unsigned int i = 0;
 
 	if (stacking) {
@@ -262,6 +300,8 @@ void ewmh_update_client_list(bool stacking)
 		}
 		xcb_ewmh_set_client_list(ewmh, default_screen, clients_count, wins);
 	}
+
+	free(wins);
 }
 
 void ewmh_wm_state_update(node_t *n)
