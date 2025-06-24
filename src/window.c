@@ -1,3 +1,4 @@
+/* window.c */
 /* Copyright (c) 2012, Bastien Dejean
  * All rights reserved.
  *
@@ -26,6 +27,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <limits.h>
 #include <xcb/shape.h>
 #include "bspwm.h"
 #include "ewmh.h"
@@ -156,8 +158,8 @@ bool manage_window(xcb_window_t win, rule_consequence_t *csq, int fd)
 		window_center(m, c);
 	}
 
-	snprintf(c->class_name, sizeof(c->class_name), "%s", csq->class_name);
-	snprintf(c->instance_name, sizeof(c->instance_name), "%s", csq->instance_name);
+	strlcpy(c->class_name, csq->class_name, sizeof(c->class_name));
+	strlcpy(c->instance_name, csq->instance_name, sizeof(c->instance_name));
 
 	if ((csq->state != NULL && (*(csq->state) == STATE_FLOATING || *(csq->state) == STATE_FULLSCREEN)) || csq->hidden) {
 		n->vacant = true;
@@ -610,8 +612,9 @@ bool resize_client(coordinates_t *loc, resize_handle_t rh, int dx, int dy, bool 
 				h = dy - y;
 			}
 		}
-		width = MAX(1, w);
-		height = MAX(1, h);
+		/* Prevent integer overflow */
+		width = MIN(MAX(1, w), UINT16_MAX);
+		height = MIN(MAX(1, h), UINT16_MAX);
 		apply_size_hints(n->client, &width, &height);
 		if (rh & HANDLE_LEFT) {
 			x += rect.width - width;
