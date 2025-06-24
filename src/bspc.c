@@ -31,30 +31,51 @@
 #include <poll.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <limits.h>
+#include <errno.h>
 #include "helpers.h"
 #include "common.h"
+
+#define MAX_ARGS 1024
+#define MSG_CHUNK_SIZE 4096
 
 int main(int argc, char *argv[])
 {
 	int sock_fd;
-	struct sockaddr_un sock_address;
-	char msg[BUFSIZ], rsp[BUFSIZ];
+	struct sockaddr_un sock_address = {0};
+	char *msg = NULL;
+	char rsp[BUFSIZ];
+	size_t msg_size = 0;
+	size_t msg_capacity = MSG_CHUNK_SIZE;
 
 	if (argc < 2) {
 		err("No arguments given.\n");
 	}
 
-	sock_address.sun_family = AF_UNIX;
-	char *sp;
+	if (argc > MAX_ARGS) {
+		err("Too many arguments (max %d).\n", MAX_ARGS);
+	}
 
-	sp = getenv(SOCKET_ENV_VAR);
+	sock_address.sun_family = AF_UNIX;
+	char *sp = getenv(SOCKET_ENV_VAR);
+
 	if (sp != NULL) {
-		snprintf(sock_address.sun_path, sizeof(sock_address.sun_path), "%s", sp);
+		size_t sp_len = strnlen(sp, sizeof(sock_address.sun_path));
+		if (sp_len >= sizeof(sock_address.sun_path)) {
+			err("Socket path too long.\n");
+		}
+		memcpy(sock_address.sun_path, sp, sp_len);
+		sock_address.sun_path[sp_len] = '\0';
 	} else {
 		char *host = NULL;
 		int dn = 0, sn = 0;
 		if (xcb_parse_display(NULL, &host, &dn, &sn) != 0) {
-			snprintf(sock_address.sun_path, sizeof(sock_address.sun_path), SOCKET_PATH_TPL, host, dn, sn);
+			int ret = snprintf(sock_address.sun_path, sizeof(sock_address.sun_path),
+			                   SOCKET_PATH_TPL, host, dn, sn);
+			if (ret < 0 || (size_t)ret >= sizeof(sock_address.sun_path)) {
+				free(host);
+				err("Socket path too long.\n");
+			}
 		}
 		free(host);
 	}
@@ -64,25 +85,61 @@ int main(int argc, char *argv[])
 		return EXIT_SUCCESS;
 	}
 
-	if ((sock_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+	if ((sock_fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) == -1) {
 		err("Failed to create the socket.\n");
 	}
 
 	if (connect(sock_fd, (struct sockaddr *) &sock_address, sizeof(sock_address)) == -1) {
+		close(sock_fd);
 		err("Failed to connect to the socket.\n");
 	}
 
+	msg = malloc(msg_capacity);
+	if (msg == NULL) {
+		close(sock_fd);
+		err("Failed to allocate message buffer.\n");
+	}
+
 	argc--, argv++;
-	int msg_len = 0;
 
-	for (int offset = 0, rem = sizeof(msg), n = 0; argc > 0 && rem > 0; offset += n, rem -= n, argc--, argv++) {
-		n = snprintf(msg + offset, rem, "%s%c", *argv, 0);
-		msg_len += n;
+	for (int i = 0; i < argc; i++) {
+		size_t arg_len = strlen(argv[i]) + 1;
+
+		while (msg_size + arg_len > msg_capacity) {
+			size_t new_capacity = msg_capacity * 2;
+			if (new_capacity > INT_MAX) {
+				free(msg);
+				close(sock_fd);
+				err("Message too large.\n");
+			}
+			char *new_msg = realloc(msg, new_capacity);
+			if (new_msg == NULL) {
+				free(msg);
+				close(sock_fd);
+				err("Failed to grow message buffer.\n");
+			}
+			msg = new_msg;
+			msg_capacity = new_capacity;
+		}
+
+		memcpy(msg + msg_size, argv[i], arg_len - 1);
+		msg[msg_size + arg_len - 1] = '\0';
+		msg_size += arg_len;
 	}
 
-	if (send(sock_fd, msg, msg_len, 0) == -1) {
-		err("Failed to send the data.\n");
+	ssize_t sent = 0;
+	while (sent < (ssize_t)msg_size) {
+		ssize_t n = send(sock_fd, msg + sent, msg_size - sent, MSG_NOSIGNAL);
+		if (n == -1) {
+			if (errno == EINTR) continue;
+			free(msg);
+			close(sock_fd);
+			err("Failed to send the data.\n");
+		}
+		sent += n;
 	}
+
+	free(msg);
 
 	int ret = EXIT_SUCCESS, nb;
 
