@@ -1,3 +1,19 @@
+# 0.10.4
+
+### Security Fixes
+- Fix buffer overflow in `handle_message()` by adding bounds check for j index
+- Fix memory leak in `cmd_rule()` by freeing rule object on tokenization failure  
+- Fix buffer overflow in `cmd_rule()` effect string construction
+- Fix memory leaks in `cmd_query()` by freeing selectors on all error paths
+- Fix format string vulnerability by using `"%s"` format specifier for empty strings
+- Ensure null termination after `snprintf()` calls in `cmd_rule()`
+- Replace `strlcpy` with `strncpy`+null termination in `window.c` for portability
+
+### Bug Fixes
+- Remove duplicate function declarations in `ewmh.h`
+- Remove unnecessary comment from `window.c`
+- Fix incorrect null terminator assignments (was `'0'`, now `'\0'`)
+
 # From 0.10.2 to 0.10.3
 * **src/events.c**
 
