@@ -1,4 +1,3 @@
-/* window.c */
 /* Copyright (c) 2012, Bastien Dejean
  * All rights reserved.
  *
@@ -158,8 +157,10 @@ bool manage_window(xcb_window_t win, rule_consequence_t *csq, int fd)
 		window_center(m, c);
 	}
 
-	strlcpy(c->class_name, csq->class_name, sizeof(c->class_name));
-	strlcpy(c->instance_name, csq->instance_name, sizeof(c->instance_name));
+	strncpy(c->class_name, csq->class_name, sizeof(c->class_name) - 1);
+	c->class_name[sizeof(c->class_name) - 1] = '\0';
+	strncpy(c->instance_name, csq->instance_name, sizeof(c->instance_name) - 1);
+	c->instance_name[sizeof(c->instance_name) - 1] = '\0';
 
 	if ((csq->state != NULL && (*(csq->state) == STATE_FLOATING || *(csq->state) == STATE_FULLSCREEN)) || csq->hidden) {
 		n->vacant = true;

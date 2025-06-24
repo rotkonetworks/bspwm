@@ -56,6 +56,11 @@ void handle_message(char *msg, int msg_len, FILE *rsp)
 
 	for (int i = 0, j = 0; i < msg_len; i++) {
 		if (msg[i] == 0) {
+			if (j >= msg_len) {
+				free(args);
+				perror("Handle message: buffer overflow");
+				return;
+			}
 			args[num++] = msg + j;
 			j = i + 1;
 		}
@@ -151,7 +156,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				}
 			}
 			if (dst.node == NULL || !focus_node(dst.monitor, dst.desktop, dst.node)) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 		} else if (streq("-a", *args) || streq("--activate", *args)) {
@@ -165,7 +170,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				}
 			}
 			if (dst.node == NULL || !activate_node(dst.monitor, dst.desktop, dst.node)) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 		} else if (streq("-d", *args) || streq("--to-desktop", *args)) {
@@ -186,7 +191,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 					trg.monitor = dst.monitor;
 					trg.desktop = dst.desktop;
 				} else {
-					fail(rsp, "");
+					fail(rsp, "%s", "");
 					break;
 				}
 			} else {
@@ -211,7 +216,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 					trg.monitor = dst.monitor;
 					trg.desktop = dst.monitor->desk;
 				} else {
-					fail(rsp, "");
+					fail(rsp, "%s", "");
 					break;
 				}
 			} else {
@@ -236,7 +241,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 					trg.monitor = dst.monitor;
 					trg.desktop = dst.desktop;
 				} else {
-					fail(rsp, "");
+					fail(rsp, "%s", "");
 					break;
 				}
 			} else {
@@ -261,7 +266,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 					trg.monitor = dst.monitor;
 					trg.desktop = dst.desktop;
 				} else {
-					fail(rsp, "");
+					fail(rsp, "%s", "");
 					break;
 				}
 			} else {
@@ -277,7 +282,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 			stack_layer_t lyr;
 			if (parse_stack_layer(*args, &lyr)) {
 				if (!set_layer(trg.monitor, trg.desktop, trg.node, lyr)) {
-					fail(rsp, "");
+					fail(rsp, "%s", "");
 					break;
 				}
 			} else {
@@ -300,7 +305,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				if (trg.node != NULL && trg.node->client != NULL) {
 					cst = trg.node->client->last_state;
 				} else {
-					fail(rsp, "");
+					fail(rsp, "%s", "");
 					break;
 				}
 			} else if (parse_client_state(*args, &cst)) {
@@ -313,7 +318,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (!set_state(trg.monitor, trg.desktop, trg.node, cst)) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			changed = true;
@@ -324,7 +329,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (trg.node == NULL) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			char *key = strtok(*args, EQL_TOK);
@@ -363,7 +368,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (trg.node == NULL || trg.node->vacant) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			if (streq("cancel", *args)) {
@@ -396,7 +401,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (trg.node == NULL || trg.node->vacant) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			double rat;
@@ -418,7 +423,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				num--, args++;
 				if (sscanf(*args, "%i", &dy) == 1) {
 					if (!move_client(&trg, dx, dy)) {
-						fail(rsp, "");
+						fail(rsp, "%s", "");
 						break;
 					}
 				} else {
@@ -443,7 +448,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 					num--, args++;
 					if (sscanf(*args, "%i", &dy) == 1) {
 						if (!resize_client(&trg, rh, dx, dy, true)) {
-							fail(rsp, "");
+							fail(rsp, "%s", "");
 							break;
 						}
 					} else {
@@ -465,7 +470,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (trg.node == NULL) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			cycle_dir_t cyc;
@@ -476,7 +481,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 			} else if (parse_split_type(*args, &typ)) {
 				changed |= set_type(trg.node, typ);
 			} else {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 		} else if (streq("-r", *args) || streq("--ratio", *args)) {
@@ -486,7 +491,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (trg.node == NULL) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			if ((*args)[0] == '+' || (*args)[0] == '-') {
@@ -502,7 +507,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 					if (rat > 0 && rat < 1) {
 						changed |= set_ratio(trg.node, rat);
 					} else {
-						fail(rsp, "");
+						fail(rsp, "%s", "");
 						break;
 					}
 				} else {
@@ -525,7 +530,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (trg.node == NULL) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			flip_t flp;
@@ -533,7 +538,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				flip_tree(trg.node, flp);
 				changed = true;
 			} else {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 		} else if (streq("-R", *args) || streq("--rotate", *args)) {
@@ -543,7 +548,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (trg.node == NULL) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			int deg;
@@ -556,14 +561,14 @@ void cmd_node(char **args, int num, FILE *rsp)
 			}
 		} else if (streq("-E", *args) || streq("--equalize", *args)) {
 			if (trg.node == NULL) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			equalize_tree(trg.node);
 			changed = true;
 		} else if (streq("-B", *args) || streq("--balance", *args)) {
 			if (trg.node == NULL) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			balance_tree(trg.node);
@@ -575,7 +580,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (trg.node == NULL) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			circulate_dir_t cir;
@@ -595,7 +600,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (trg.node == NULL || locked_count(trg.node) > 0) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			close_node(trg.node);
@@ -606,7 +611,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (trg.node == NULL) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			kill_node(trg.monitor, trg.desktop, trg.node);
@@ -677,7 +682,7 @@ void cmd_desktop(char **args, int num, FILE *rsp)
 			if (activate_desktop(dst.monitor, dst.desktop)) {
 				activate_node(dst.monitor, dst.desktop, NULL);
 			} else {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 		} else if (streq("-m", *args) || streq("--to-monitor", *args)) {
@@ -687,7 +692,7 @@ void cmd_desktop(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (trg.monitor->desk_head == trg.monitor->desk_tail) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 			coordinates_t dst;
@@ -701,7 +706,7 @@ void cmd_desktop(char **args, int num, FILE *rsp)
 				if (transfer_desktop(trg.monitor, dst.monitor, trg.desktop, follow)) {
 					trg.monitor = dst.monitor;
 				} else {
-					fail(rsp, "");
+					fail(rsp, "%s", "");
 					break;
 				}
 			} else {
@@ -725,7 +730,7 @@ void cmd_desktop(char **args, int num, FILE *rsp)
 				if (swap_desktops(trg.monitor, trg.desktop, dst.monitor, dst.desktop, follow)) {
 					trg.monitor = dst.monitor;
 				} else {
-					fail(rsp, "");
+					fail(rsp, "%s", "");
 					break;
 				}
 			} else {
@@ -780,7 +785,7 @@ void cmd_desktop(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (!ret) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 		} else if (streq("-n", *args) || streq("--rename", *args)) {
@@ -803,7 +808,7 @@ void cmd_desktop(char **args, int num, FILE *rsp)
 				remove_desktop(trg.monitor, trg.desktop);
 				return;
 			} else {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 		} else {
@@ -851,7 +856,7 @@ void cmd_monitor(char **args, int num, FILE *rsp)
 				int ret;
 				if ((ret = monitor_from_desc(*args, &ref, &dst)) != SELECTOR_OK) {
 					handle_failure(ret, "monitor -f", *args, rsp);
-					fail(rsp, "");
+					fail(rsp, "%s", "");
 					return;
 				}
 			}
@@ -866,7 +871,7 @@ void cmd_monitor(char **args, int num, FILE *rsp)
 			int ret;
 			if ((ret = monitor_from_desc(*args, &ref, &dst)) == SELECTOR_OK) {
 				if (!swap_monitors(trg.monitor, dst.monitor)) {
-					fail(rsp, "");
+					fail(rsp, "%s", "");
 					return;
 				}
 			} else {
@@ -915,7 +920,7 @@ void cmd_monitor(char **args, int num, FILE *rsp)
 				return;
 			}
 			if (mon_head == mon_tail) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				return;
 			}
 			remove_monitor(trg.monitor);
@@ -998,6 +1003,9 @@ void cmd_query(char **args, int num, FILE *rsp)
 				monitor_ref.node = NULL;
 				if ((ret = monitor_from_desc(*args, &tmp, &monitor_ref)) != SELECTOR_OK) {
 					handle_failure(ret, "query -M", *args, rsp);
+					free(monitor_sel);
+					free(desktop_sel);
+					free(node_sel);
 					goto end;
 				}
 			}
@@ -1010,6 +1018,9 @@ void cmd_query(char **args, int num, FILE *rsp)
 				desktop_ref.node = NULL;
 				if ((ret = desktop_from_desc(*args, &tmp, &desktop_ref)) != SELECTOR_OK) {
 					handle_failure(ret, "query -D", *args, rsp);
+					free(monitor_sel);
+					free(desktop_sel);
+					free(node_sel);
 					goto end;
 				}
 			}
@@ -1021,6 +1032,9 @@ void cmd_query(char **args, int num, FILE *rsp)
 				coordinates_t tmp = node_ref;
 				if ((ret = node_from_desc(*args, &tmp, &node_ref)) != SELECTOR_OK) {
 					handle_failure(ret, "query -N", *args, rsp);
+					free(monitor_sel);
+					free(desktop_sel);
+					free(node_sel);
 					goto end;
 				}
 			}
@@ -1035,12 +1049,18 @@ void cmd_query(char **args, int num, FILE *rsp)
 					char *desc = copy_string(*args, strlen(*args));
 					if (!parse_monitor_modifiers(desc, monitor_sel)) {
 						handle_failure(SELECTOR_BAD_MODIFIERS, "query -m", *args, rsp);
+						free(monitor_sel);
+						free(desktop_sel);
+						free(node_sel);
 						free(desc);
 						goto end;
 					}
 					free(desc);
 				} else if ((ret = monitor_from_desc(*args, &monitor_ref, &trg)) != SELECTOR_OK) {
 					handle_failure(ret, "query -m", *args, rsp);
+					free(monitor_sel);
+					free(desktop_sel);
+					free(node_sel);
 					goto end;
 				}
 			} else {
@@ -1057,12 +1077,18 @@ void cmd_query(char **args, int num, FILE *rsp)
 					char *desc = copy_string(*args, strlen(*args));
 					if (!parse_desktop_modifiers(desc, desktop_sel)) {
 						handle_failure(SELECTOR_BAD_MODIFIERS, "query -d", *args, rsp);
+						free(desktop_sel);
+						free(monitor_sel);
+						free(node_sel);
 						free(desc);
 						goto end;
 					}
 					free(desc);
 				} else if ((ret = desktop_from_desc(*args, &desktop_ref, &trg)) != SELECTOR_OK) {
 					handle_failure(ret, "query -d", *args, rsp);
+					free(desktop_sel);
+					free(monitor_sel);
+					free(node_sel);
 					goto end;
 				}
 			} else {
@@ -1079,18 +1105,24 @@ void cmd_query(char **args, int num, FILE *rsp)
 					char *desc = copy_string(*args, strlen(*args));
 					if (!parse_node_modifiers(desc, node_sel)) {
 						handle_failure(SELECTOR_BAD_MODIFIERS, "query -n", *args, rsp);
+						free(node_sel);
+						free(monitor_sel);
+						free(desktop_sel);
 						free(desc);
 						goto end;
 					}
 					free(desc);
 				} else if ((ret = node_from_desc(*args, &node_ref, &trg)) != SELECTOR_OK) {
 					handle_failure(ret, "query -n", *args, rsp);
+					free(node_sel);
+					free(monitor_sel);
+					free(desktop_sel);
 					goto end;
 				}
 			} else {
 				trg = node_ref;
 				if (trg.node == NULL) {
-					fail(rsp, "");
+					fail(rsp, "%s", "");
 					goto end;
 				}
 			}
@@ -1131,15 +1163,15 @@ void cmd_query(char **args, int num, FILE *rsp)
 
 	if (dom == DOMAIN_NODE) {
 		if (query_node_ids(&monitor_ref, &desktop_ref, &node_ref, &trg, monitor_sel, desktop_sel, node_sel, rsp) < 1) {
-			fail(rsp, "");
+			fail(rsp, "%s", "");
 		}
 	} else if (dom == DOMAIN_DESKTOP) {
 		if (query_desktop_ids(&monitor_ref, &desktop_ref, &trg, monitor_sel, desktop_sel, print_ids ? fprint_desktop_id : fprint_desktop_name, rsp) < 1) {
-			fail(rsp, "");
+			fail(rsp, "%s", "");
 		}
 	} else if (dom == DOMAIN_MONITOR) {
 		if (query_monitor_ids(&monitor_ref, &trg, monitor_sel, print_ids ? fprint_monitor_id : fprint_monitor_name, rsp) < 1) {
-			fail(rsp, "");
+			fail(rsp, "%s", "");
 		}
 	} else {
 		if (trg.node != NULL) {
@@ -1179,6 +1211,7 @@ void cmd_rule(char **args, int num, FILE *rsp)
 			char *instance_name = tokenize_with_escape(&state, NULL, COL_TOK[0]);
 			char *name = tokenize_with_escape(&state, NULL, COL_TOK[0]);
 			if (!class_name || !instance_name || !name) {
+				free(rule);
 				free(class_name);
 				free(instance_name);
 				free(name);
@@ -1186,10 +1219,15 @@ void cmd_rule(char **args, int num, FILE *rsp)
 			}
 
 			snprintf(rule->class_name, sizeof(rule->class_name), "%s", class_name);
+			rule->class_name[sizeof(rule->class_name) - 1] = '\0';
 			snprintf(rule->instance_name, sizeof(rule->instance_name), "%s",
 					 instance_name[0] == '\0' ? MATCH_ANY : instance_name);
+			rule->instance_name[sizeof(rule->instance_name) - 1] = '0';
+			rule->instance_name[sizeof(rule->instance_name) - 1] = '\0';
 			snprintf(rule->name, sizeof(rule->name), "%s",
 					 name[0] == '\0' ? MATCH_ANY : name);
+			rule->name[sizeof(rule->name) - 1] = '0';
+			rule->name[sizeof(rule->name) - 1] = '\0';
 			free(class_name);
 			free(instance_name);
 			free(name);
@@ -1200,7 +1238,7 @@ void cmd_rule(char **args, int num, FILE *rsp)
 				if (streq("-o", *args) || streq("--one-shot", *args)) {
 					rule->one_shot = true;
 				} else {
-					for (size_t j = 0; i < sizeof(rule->effect) && j < strlen(*args); i++, j++) {
+					for (size_t j = 0; i < sizeof(rule->effect) - 1 && j < strlen(*args); i++, j++) {
 						rule->effect[i] = (*args)[j];
 					}
 					if (num > 1 && i < sizeof(rule->effect)) {
@@ -1209,7 +1247,10 @@ void cmd_rule(char **args, int num, FILE *rsp)
 				}
 				num--, args++;
 			}
-			rule->effect[MIN(i, sizeof(rule->effect) - 1)] = '\0';
+			if (i >= sizeof(rule->effect)) {
+				i = sizeof(rule->effect) - 1;
+			}
+			rule->effect[i] = '\0';
 			add_rule(rule);
 		} else if (streq("-r", *args) || streq("--remove", *args)) {
 			num--, args++;
@@ -1258,7 +1299,7 @@ void cmd_wm(char **args, int num, FILE *rsp)
 				break;
 			}
 			if (!restore_state(*args)) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				break;
 			}
 		} else if (streq("-a", *args) || streq("--add-monitor", *args)) {
@@ -1570,7 +1611,7 @@ void set_setting(coordinates_t loc, char *name, char *value, FILE *rsp)
 	} else if (streq("window_gap", name)) {
 		int wg;
 		if (sscanf(value, "%i", &wg) != 1) {
-			fail(rsp, "");
+			fail(rsp, "%s", "");
 			return;
 		}
 		SET_DEF_DEFMON_DESK(window_gap, wg)
@@ -1634,7 +1675,7 @@ void set_setting(coordinates_t loc, char *name, char *value, FILE *rsp)
 #define SET_STR(s) \
 	} else if (streq(#s, name)) { \
 		if (snprintf(s, sizeof(s), "%s", value) < 0) { \
-			fail(rsp, ""); \
+			fail(rsp, "%s", ""); \
 			return; \
 		}
 	SET_STR(external_rules_command)
@@ -1736,7 +1777,7 @@ void set_setting(coordinates_t loc, char *name, char *value, FILE *rsp)
 		bool b;
 		if (parse_bool(value, &b)) {
 			if (b == single_monocle) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				return;
 			}
 			single_monocle = b;
@@ -1754,7 +1795,7 @@ void set_setting(coordinates_t loc, char *name, char *value, FILE *rsp)
 		bool b;
 		if (parse_bool(value, &b)) {
 			if (b == focus_follows_pointer) {
-				fail(rsp, "");
+				fail(rsp, "%s", "");
 				return;
 			}
 			focus_follows_pointer = b;
@@ -1948,7 +1989,7 @@ void handle_failure(int code, char *src, char *val, FILE *rsp)
 			fail(rsp, "%s: Invalid modifier found in '%s'.\n", src, val);
 			break;
 		case SELECTOR_INVALID:
-			fail(rsp, "");
+			fail(rsp, "%s", "");
 			break;
 	}
 }
@@ -1961,3 +2002,4 @@ void fail(FILE *rsp, char *fmt, ...)
 	vfprintf(rsp, fmt, ap);
 	va_end(ap);
 }
+
