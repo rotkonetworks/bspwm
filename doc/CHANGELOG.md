@@ -1,3 +1,23 @@
+# 0.10.5
+
+### Security Fixes
+- Fix integer overflow in binary search by using `left + ((right - left) >> 1)` instead of `(left + right) >> 1`
+- Add null pointer checks in `parse_rectangle()` and `BINARY_SEARCH_PARSER` macro
+- Fix potential buffer overflow in `parse_keys_values()` by using `strnlen()` and proper bounds checking
+- Fix format string vulnerability in `subscribe.c` by using `fprintf()` with `"%s"` format specifier
+- Implement secure memory zeroing with `secure_memzero()` to prevent sensitive data from being optimized away
+- Fix potential stack overflow in `rotate_tree_rec_bounded()` by adding depth check
+- Add validation for zero width/height in `parse_rectangle()`
+- Fix event queue memory handling with proper deep copy of XCB events
+
+### Bug Fixes
+- Fix `SAFE_ADD` macro to properly handle negative values with parentheses
+- Move `secure_memzero()` from static in `tree.c` to global helper function
+- Add proper memory cleanup for `csq->layer` using `secure_memzero()` before freeing
+- Fix potential memory leak in `parse_keys_values()` by removing duplicate null check
+- Reorder `node_t` struct members for better memory alignment and cache performance
+- Clean up trailing whitespace in `rule.c`
+
 # 0.10.4
 
 ### Security Fixes
