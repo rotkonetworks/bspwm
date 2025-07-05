@@ -42,7 +42,7 @@
 #include "tree.h"
 
 #define MAX_TREE_DEPTH 256
-#define SAFE_ADD(a, b, max) ((a) > (max) - (b) ? (max) : (a) + (b))
+#define SAFE_ADD(a, b, max) ((b) > 0 && (a) > (max) - (b)) ? (max) : ((b) < 0 && (a) < INT_MIN - (b)) ? INT_MIN : (a) + (b)
 #define SAFE_SUB(a, b) ((a) < (b) ? 0 : (a) - (b))
 
 /* Secure memset that won't be optimized away */
