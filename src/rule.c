@@ -122,7 +122,7 @@ void remove_rule_by_cause(char *cause)
     free(class_name);
     free(instance_name);
     free(name);
-} 
+}
 
 
 bool remove_rule_by_index(int idx)
@@ -333,11 +333,19 @@ void _apply_name(xcb_window_t win, rule_consequence_t *csq)
 
 void parse_keys_values(char *buf, rule_consequence_t *csq)
 {
-    if (buf == NULL || strlen(buf) >= BUFSIZ) {
+    if (buf == NULL)
         return;
-    }
 
-    char *buf_copy = malloc(strlen(buf) + 1);
+    size_t len = strnlen(buf, BUFSIZ);
+    if (len >= BUFSIZ)
+        return;
+
+    char *buf_copy = malloc(len + 1);
+    if (buf_copy == NULL)
+        return;
+
+    memcpy(buf_copy, buf, len);
+    buf_copy[len] = '\0';
     if (buf_copy == NULL) {
         return;
     }
