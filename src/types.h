@@ -258,7 +258,11 @@ struct constraints_t {
 
 typedef struct node_t node_t;
 struct node_t {
-	uint32_t id;
+	node_t *parent;
+    node_t *first_child;
+    node_t *second_child;
+    client_t *client;
+    uint32_t id;
 	split_type_t split_type;
 	double split_ratio;
 	presel_t *presel;
@@ -270,10 +274,6 @@ struct node_t {
 	bool private;
 	bool locked;
 	bool marked;
-	node_t *first_child;
-	node_t *second_child;
-	node_t *parent;
-	client_t *client;
 };
 
 typedef struct padding_t padding_t;
