@@ -89,7 +89,7 @@ bool manage_window(xcb_window_t win, rule_consequence_t *csq, int fd)
 	}
 
 	if (!csq->manage) {
-		free(csq->layer);
+		secure_memzero(csq->layer, sizeof(stack_layer_t)); free(csq->layer);
 		free(csq->state);
 		window_show(win);
 		return false;
@@ -225,7 +225,7 @@ bool manage_window(xcb_window_t win, rule_consequence_t *csq, int fd)
 		draw_border(n, false, (m == mon));
 	}
 
-	free(csq->layer);
+	secure_memzero(csq->layer, sizeof(stack_layer_t)); free(csq->layer);
 	free(csq->state);
 
 	return true;
