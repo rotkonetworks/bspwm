@@ -216,12 +216,18 @@ void postpone_event(pending_rule_t *pr, xcb_generic_event_t *evt)
 
 event_queue_t *make_event_queue(xcb_generic_event_t *evt)
 {
-	event_queue_t *eq = calloc(1, sizeof(event_queue_t));
-	eq->prev = eq->next = NULL;
-	eq->event = *evt;
-	return eq;
-}
+    if (!evt) return NULL;
 
+    event_queue_t *eq = calloc(1, sizeof(event_queue_t));
+    if (!eq) return NULL;
+
+    // deep copy the event
+    size_t evt_size = 32; // XCB events are 32 bytes
+    memcpy(&eq->event, evt, evt_size);
+
+    eq->prev = eq->next = NULL;
+    return eq;
+}
 
 #define SET_CSQ_SPLIT_DIR(val) \
 	do { \
