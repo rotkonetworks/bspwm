@@ -290,17 +290,17 @@ bool parse_rectangle(char *s, xcb_rectangle_t *r)
    char *end;
 
    unsigned long w = strtoul(s, &end, 10);
-   if (*end != 'x' || w > UINT16_MAX) return false;
-
+   if (*end != 'x' || w == 0 || w > UINT16_MAX) return false;
    s = end + 1;
+
    unsigned long h = strtoul(s, &end, 10);
-   if (*end != '+' || h > UINT16_MAX) return false;
-
+   if (*end != '+' || h == 0 || h > UINT16_MAX) return false;
    s = end + 1;
+
    long x = strtol(s, &end, 10);
    if (*end != '+' || x < INT16_MIN || x > INT16_MAX) return false;
-
    s = end + 1;
+
    long y = strtol(s, &end, 10);
    if (*end != '\0' || y < INT16_MIN || y > INT16_MAX) return false;
 
@@ -308,6 +308,7 @@ bool parse_rectangle(char *s, xcb_rectangle_t *r)
    r->height = (uint16_t)h;
    r->x = (int16_t)x;
    r->y = (int16_t)y;
+
    return true;
 }
 
