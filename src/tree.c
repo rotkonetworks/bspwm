@@ -1370,7 +1370,7 @@ static void rotate_tree_rec_bounded(node_t *n, int deg, int depth)
 		}
 	}
 
-	rotate_tree_rec_bounded(n->first_child, deg, depth + 1);
+	if (depth < MAX_TREE_DEPTH) rotate_tree_rec_bounded(n->first_child, deg, depth + 1);
 	rotate_tree_rec_bounded(n->second_child, deg, depth + 1);
 }
 
