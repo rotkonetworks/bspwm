@@ -15,6 +15,8 @@ pkgs.mkShell {
 
     # drive windows
     xdotool
+
+	gdb
   ];
 }
 
