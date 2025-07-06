@@ -1,3 +1,7 @@
+# v0.10.8
+### Bug fix
+- Both lines 93 and 229 in src/window.c had the same issue - calling secure_memzero on potentially NULL csq->layer pointers. The fix adds NULL checks before the secure cleanup.
+
 # v0.10.6 / v0.10.7
 
 ### New Features
