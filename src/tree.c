@@ -40,6 +40,7 @@
 #include "stack.h"
 #include "window.h"
 #include "tree.h"
+#include "animation.h"
 
 #define MAX_TREE_DEPTH 256
 #define SAFE_ADD(a, b, max) ((b) > 0 && (a) > (max) - (b)) ? (max) : (a) + (b)
@@ -64,7 +65,7 @@ void arrange(monitor_t *m, desktop_t *d)
 
 	rect.x = SAFE_ADD(rect.x, SAFE_ADD(m->padding.left, d->padding.left, UINT16_MAX), UINT16_MAX);
 	rect.y = SAFE_ADD(rect.y, SAFE_ADD(m->padding.top, d->padding.top, UINT16_MAX), UINT16_MAX);
-	rect.width = SAFE_SUB(rect.width, SAFE_ADD(m->padding.left + d->padding.left, 
+	rect.width = SAFE_SUB(rect.width, SAFE_ADD(m->padding.left + d->padding.left,
 	                                           d->padding.right + m->padding.right, UINT16_MAX));
 	rect.height = SAFE_SUB(rect.height, SAFE_ADD(m->padding.top + d->padding.top,
 	                                             d->padding.bottom + m->padding.bottom, UINT16_MAX));
@@ -105,7 +106,7 @@ void apply_layout(monitor_t *m, desktop_t *d, node_t *n, xcb_rectangle_t rect, x
 
 		unsigned int bw;
 		bool the_only_window = !m->prev && !m->next && d->root && d->root->client;
-		
+
 		if ((borderless_monocle && d->layout == LAYOUT_MONOCLE && IS_TILED(n->client)) ||
 		    (borderless_singleton && the_only_window) ||
 		    n->client->state == STATE_FULLSCREEN) {
@@ -117,19 +118,19 @@ void apply_layout(monitor_t *m, desktop_t *d, node_t *n, xcb_rectangle_t rect, x
 		xcb_rectangle_t r;
 		xcb_rectangle_t cr = get_window_rectangle(n);
 		client_state_t s = n->client->state;
-		
+
 		if (s == STATE_TILED || s == STATE_PSEUDO_TILED) {
 			int wg = (gapless_monocle && d->layout == LAYOUT_MONOCLE ? 0 : d->window_gap);
 			r = rect;
-			
+
 			if ((int)bw > (INT_MAX - wg) / 2) {
 				bw = 0;
 			}
-			
+
 			int bleed = wg + 2 * (int)bw;
 			r.width = (bleed < (int)r.width ? r.width - bleed : 1);
 			r.height = (bleed < (int)r.height ? r.height - bleed : 1);
-			
+
 			if (s == STATE_PSEUDO_TILED) {
 				xcb_rectangle_t f = n->client->floating_rectangle;
 				r.width = MIN(r.width, f.width);
@@ -150,10 +151,15 @@ void apply_layout(monitor_t *m, desktop_t *d, node_t *n, xcb_rectangle_t rect, x
 		apply_size_hints(n->client, &r.width, &r.height);
 
 		if (!rect_eq(r, cr)) {
-			window_move_resize(n->id, r.x, r.y, r.width, r.height);
+			client_t *c = n->client;
+			if (animation_enabled && c != NULL && c->state == STATE_TILED) {
+				animate_window(n->id, r);
+			} else {
+				window_move_resize(n->id, r.x, r.y, r.width, r.height);
+			}
 			if (!grabbing) {
 				put_status(SBSC_MASK_NODE_GEOMETRY, "node_geometry 0x%08X 0x%08X 0x%08X %ux%u+%i+%i\n",
-				           m->id, d->id, n->id, r.width, r.height, r.x, r.y);
+			   m->id, d->id, n->id, r.width, r.height, r.x, r.y);
 			}
 		}
 
@@ -174,7 +180,7 @@ void apply_layout(monitor_t *m, desktop_t *d, node_t *n, xcb_rectangle_t rect, x
 				fence = (unsigned int)(rect.width * n->split_ratio);
 				uint16_t min_sum = SAFE_ADD(n->first_child->constraints.min_width,
 				                           n->second_child->constraints.min_width, UINT16_MAX);
-				
+
 				if (min_sum <= rect.width) {
 					if (fence < n->first_child->constraints.min_width) {
 						fence = n->first_child->constraints.min_width;
@@ -184,14 +190,14 @@ void apply_layout(monitor_t *m, desktop_t *d, node_t *n, xcb_rectangle_t rect, x
 						n->split_ratio = (double)fence / (double)rect.width;
 					}
 				}
-				
+
 				first_rect = (xcb_rectangle_t){rect.x, rect.y, fence, rect.height};
 				second_rect = (xcb_rectangle_t){rect.x + fence, rect.y, rect.width - fence, rect.height};
 			} else {
 				fence = (unsigned int)(rect.height * n->split_ratio);
 				uint16_t min_sum = SAFE_ADD(n->first_child->constraints.min_height,
 				                           n->second_child->constraints.min_height, UINT16_MAX);
-				
+
 				if (min_sum <= rect.height) {
 					if (fence < n->first_child->constraints.min_height) {
 						fence = n->first_child->constraints.min_height;
@@ -201,7 +207,7 @@ void apply_layout(monitor_t *m, desktop_t *d, node_t *n, xcb_rectangle_t rect, x
 						n->split_ratio = (double)fence / (double)rect.height;
 					}
 				}
-				
+
 				first_rect = (xcb_rectangle_t){rect.x, rect.y, rect.width, fence};
 				second_rect = (xcb_rectangle_t){rect.x, rect.y + fence, rect.width, rect.height - fence};
 			}
@@ -326,7 +332,7 @@ node_t *find_public(desktop_t *d)
 	unsigned int b_automatic_area = 0;
 	node_t *b_manual = NULL;
 	node_t *b_automatic = NULL;
-	
+
 	for (node_t *n = first_extrema(d->root); n; n = next_leaf(n, d->root)) {
 		if (n->vacant) {
 			continue;
@@ -341,7 +347,7 @@ node_t *find_public(desktop_t *d)
 			b_automatic_area = n_area;
 		}
 	}
-	
+
 	return b_automatic ? b_automatic : b_manual;
 }
 
@@ -378,7 +384,7 @@ node_t *insert_node(monitor_t *m, desktop_t *d, node_t *n, node_t *f)
 		if (!c) {
 			return NULL;
 		}
-		
+
 		node_t *p = f->parent;
 		if (!f->presel && (f->private || private_count(f->parent) > 0)) {
 			node_t *k = find_public(d);
@@ -391,7 +397,7 @@ node_t *insert_node(monitor_t *m, desktop_t *d, node_t *n, node_t *f)
 				presel_dir(m, d, f, (rect.width >= rect.height ? DIR_EAST : DIR_SOUTH));
 			}
 		}
-		
+
 		n->parent = c;
 		if (!f->presel) {
 			bool single_tiled = f->client && IS_TILED(f->client) && tiled_count(d->root, true) == 1;
@@ -519,7 +525,7 @@ void insert_receptacle(monitor_t *m, desktop_t *d, node_t *n)
 	if (!r) {
 		return;
 	}
-	
+
 	insert_node(m, d, r, n);
 	put_status(SBSC_MASK_NODE_ADD, "node_add 0x%08X 0x%08X 0x%08X 0x%08X\n",
 	           m->id, d->id, n ? n->id : 0, r->id);
@@ -585,7 +591,7 @@ static void transfer_sticky_nodes_bounded(monitor_t *ms, desktop_t *ds, monitor_
 	if (!n || depth > MAX_TREE_DEPTH) {
 		return;
 	}
-	
+
 	if (n->sticky) {
 		sticky_still = false;
 		transfer_node(ms, ds, n, md, dd, dd->focus, false);
@@ -760,7 +766,7 @@ static void hide_node_bounded(desktop_t *d, node_t *n, int depth)
 	if (!n || depth > MAX_TREE_DEPTH || (!hide_sticky && n->sticky)) {
 		return;
 	}
-	
+
 	if (!n->hidden) {
 		if (n->presel && d->layout != LAYOUT_MONOCLE) {
 			window_hide(n->presel->feedback);
@@ -786,7 +792,7 @@ static void show_node_bounded(desktop_t *d, node_t *n, int depth)
 	if (!n || depth > MAX_TREE_DEPTH) {
 		return;
 	}
-	
+
 	if (!n->hidden) {
 		if (n->client) {
 			window_show(n->id);
@@ -860,7 +866,7 @@ void initialize_client(node_t *n)
 	xcb_window_t win = n->id;
 	client_t *c = n->client;
 	xcb_icccm_get_wm_protocols_reply_t protos;
-	
+
 	if (xcb_icccm_get_wm_protocols_reply(dpy, xcb_icccm_get_wm_protocols(dpy, win, ewmh->WM_PROTOCOLS), &protos, NULL) == 1) {
 		for (uint32_t i = 0; i < protos.atoms_len && i < 32; i++) {
 			if (protos.atoms[i] == WM_TAKE_FOCUS) {
@@ -871,7 +877,7 @@ void initialize_client(node_t *n)
 		}
 		xcb_icccm_get_wm_protocols_reply_wipe(&protos);
 	}
-	
+
 	xcb_ewmh_get_atoms_reply_t wm_state;
 	if (xcb_ewmh_get_wm_state_reply(ewmh, xcb_ewmh_get_wm_state(ewmh, win), &wm_state, NULL) == 1) {
 		for (unsigned int i = 0; i < wm_state.atoms_len && i < MAX_WM_STATES; i++) {
@@ -895,13 +901,13 @@ void initialize_client(node_t *n)
 		}
 		xcb_ewmh_get_atoms_reply_wipe(&wm_state);
 	}
-	
+
 	xcb_icccm_wm_hints_t hints;
 	if (xcb_icccm_get_wm_hints_reply(dpy, xcb_icccm_get_wm_hints(dpy, win), &hints, NULL) == 1 &&
 	    (hints.flags & XCB_ICCCM_WM_HINT_INPUT)) {
 		c->icccm_props.input_hint = hints.input;
 	}
-	
+
 	xcb_icccm_get_wm_normal_hints_reply(dpy, xcb_icccm_get_wm_normal_hints(dpy, win), &c->size_hints, NULL);
 }
 
@@ -1004,7 +1010,7 @@ node_t *next_node(node_t *n)
 	if (n->second_child) {
 		return first_extrema(n->second_child);
 	}
-	
+
 	node_t *p = n;
 	while (is_second_child(p)) {
 		p = p->parent;
@@ -1012,11 +1018,11 @@ node_t *next_node(node_t *n)
 			return NULL;
 		}
 	}
-	
+
 	if (is_first_child(p)) {
 		return p->parent;
 	}
-	
+
 	return NULL;
 }
 
@@ -1029,7 +1035,7 @@ node_t *prev_node(node_t *n)
 	if (n->first_child) {
 		return second_extrema(n->first_child);
 	}
-	
+
 	node_t *p = n;
 	while (is_first_child(p)) {
 		p = p->parent;
@@ -1037,11 +1043,11 @@ node_t *prev_node(node_t *n)
 			return NULL;
 		}
 	}
-	
+
 	if (is_second_child(p)) {
 		return p->parent;
 	}
-	
+
 	return NULL;
 }
 
@@ -1050,7 +1056,7 @@ node_t *next_leaf(node_t *n, node_t *r)
 	if (!n) {
 		return NULL;
 	}
-	
+
 	node_t *p = n;
 	while (is_second_child(p) && p != r) {
 		p = p->parent;
@@ -1058,11 +1064,11 @@ node_t *next_leaf(node_t *n, node_t *r)
 			return NULL;
 		}
 	}
-	
+
 	if (p == r || !p->parent) {
 		return NULL;
 	}
-	
+
 	return first_extrema(p->parent->second_child);
 }
 
@@ -1071,7 +1077,7 @@ node_t *prev_leaf(node_t *n, node_t *r)
 	if (!n) {
 		return NULL;
 	}
-	
+
 	node_t *p = n;
 	while (is_first_child(p) && p != r) {
 		p = p->parent;
@@ -1079,11 +1085,11 @@ node_t *prev_leaf(node_t *n, node_t *r)
 			return NULL;
 		}
 	}
-	
+
 	if (p == r || !p->parent) {
 		return NULL;
 	}
-	
+
 	return second_extrema(p->parent->first_child);
 }
 
@@ -1135,9 +1141,9 @@ node_t *find_fence(node_t *n, direction_t dir)
 	while (p) {
 		if ((dir == DIR_NORTH && p->split_type == TYPE_HORIZONTAL && p->rectangle.y < n->rectangle.y) ||
 		    (dir == DIR_WEST && p->split_type == TYPE_VERTICAL && p->rectangle.x < n->rectangle.x) ||
-		    (dir == DIR_SOUTH && p->split_type == TYPE_HORIZONTAL && 
+		    (dir == DIR_SOUTH && p->split_type == TYPE_HORIZONTAL &&
 		     (p->rectangle.y + p->rectangle.height) > (n->rectangle.y + n->rectangle.height)) ||
-		    (dir == DIR_EAST && p->split_type == TYPE_VERTICAL && 
+		    (dir == DIR_EAST && p->split_type == TYPE_VERTICAL &&
 		     (p->rectangle.x + p->rectangle.width) > (n->rectangle.x + n->rectangle.width))) {
 			return p;
 		}
@@ -1212,28 +1218,28 @@ void find_any_node(coordinates_t *ref, coordinates_t *dst, node_select_t *sel)
 	}
 }
 
-static bool find_any_node_in_bounded(monitor_t *m, desktop_t *d, node_t *n, 
-                                    coordinates_t *ref, coordinates_t *dst, 
+static bool find_any_node_in_bounded(monitor_t *m, desktop_t *d, node_t *n,
+                                    coordinates_t *ref, coordinates_t *dst,
                                     node_select_t *sel, int depth)
 {
 	if (!n || depth > MAX_TREE_DEPTH) {
 		return false;
 	}
-	
+
 	coordinates_t loc = {m, d, n};
 	if (node_matches(&loc, ref, sel)) {
 		*dst = loc;
 		return true;
 	}
-	
+
 	if (find_any_node_in_bounded(m, d, n->first_child, ref, dst, sel, depth + 1)) {
 		return true;
 	}
-	
+
 	return find_any_node_in_bounded(m, d, n->second_child, ref, dst, sel, depth + 1);
 }
 
-bool find_any_node_in(monitor_t *m, desktop_t *d, node_t *n, 
+bool find_any_node_in(monitor_t *m, desktop_t *d, node_t *n,
                      coordinates_t *ref, coordinates_t *dst, node_select_t *sel)
 {
 	return find_any_node_in_bounded(m, d, n, ref, dst, sel, 0);
@@ -1268,20 +1274,20 @@ void find_nearest_neighbor(coordinates_t *ref, coordinates_t *dst, direction_t d
 		if (!d) {
 			continue;
 		}
-		
+
 		for (node_t *f = first_extrema(d->root); f; f = next_leaf(f, d->root)) {
 			coordinates_t loc = {m, d, f};
 			xcb_rectangle_t r = get_rectangle(m, d, f);
-			
+
 			if (f == ref->node || !f->client || f->hidden ||
 			    is_descendant(f, ref->node) || !node_matches(&loc, ref, sel) ||
 			    !on_dir_side(rect, r, dir)) {
 				continue;
 			}
-			
+
 			uint32_t fd = boundary_distance(rect, r, dir);
 			uint32_t fr = history_rank(f);
-			
+
 			if (fd < md || (fd == md && fr < mr)) {
 				md = fd;
 				mr = fr;
@@ -1304,7 +1310,7 @@ int tiled_count(node_t *n, bool include_receptacles)
 	if (!n) {
 		return 0;
 	}
-	
+
 	int cnt = 0;
 	for (node_t *f = first_extrema(n); f; f = next_leaf(f, n)) {
 		if (!f->hidden && ((include_receptacles && !f->client) ||
@@ -1326,9 +1332,9 @@ void find_by_area(area_peak_t ap, coordinates_t *ref, coordinates_t *dst, node_s
 				if (f->vacant || !node_matches(&loc, ref, sel)) {
 					continue;
 				}
-				
+
 				unsigned int f_area = node_area(d, f);
-				if ((ap == AREA_BIGGEST && f_area > p_area) || 
+				if ((ap == AREA_BIGGEST && f_area > p_area) ||
 				    (ap == AREA_SMALLEST && f_area < p_area)) {
 					*dst = loc;
 					p_area = f_area;
@@ -1409,7 +1415,7 @@ static void equalize_tree_bounded(node_t *n, int depth)
 	if (!n || n->vacant || depth > MAX_TREE_DEPTH) {
 		return;
 	}
-	
+
 	n->split_ratio = split_ratio;
 	equalize_tree_bounded(n->first_child, depth + 1);
 	equalize_tree_bounded(n->second_child, depth + 1);
@@ -1425,19 +1431,19 @@ static int balance_tree_bounded(node_t *n, int depth)
 	if (!n || n->vacant || depth > MAX_TREE_DEPTH) {
 		return 0;
 	}
-	
+
 	if (is_leaf(n)) {
 		return 1;
 	}
-	
+
 	int b1 = balance_tree_bounded(n->first_child, depth + 1);
 	int b2 = balance_tree_bounded(n->second_child, depth + 1);
 	int b = b1 + b2;
-	
+
 	if (b1 > 0 && b2 > 0 && b > 0) {
 		n->split_ratio = (double)b1 / (double)b;
 	}
-	
+
 	return b;
 }
 
@@ -1577,7 +1583,7 @@ static void close_node_bounded(node_t *n, int depth)
 	if (!n || depth > MAX_TREE_DEPTH) {
 		return;
 	}
-	
+
 	if (n->client) {
 		if (n->client->icccm_props.delete_window) {
 			send_client_message(n->id, ewmh->WM_PROTOCOLS, WM_DELETE_WINDOW);
@@ -1602,7 +1608,7 @@ void kill_node(monitor_t *m, desktop_t *d, node_t *n)
 	}
 
 	if (IS_RECEPTACLE(n)) {
-		put_status(SBSC_MASK_NODE_REMOVE, "node_remove 0x%08X 0x%08X 0x%08X\n", 
+		put_status(SBSC_MASK_NODE_REMOVE, "node_remove 0x%08X 0x%08X 0x%08X\n",
 		           m->id, d->id, n->id);
 		remove_node(m, d, n);
 	} else {
@@ -1624,17 +1630,17 @@ void remove_node(monitor_t *m, desktop_t *d, node_t *n)
 	history_remove(d, n, true);
 	remove_stack_node(n);
 	cancel_presel_in(m, d, n);
-	
+
 	if (m->sticky_count > 0 && d == m->desk) {
 		m->sticky_count = SAFE_SUB(m->sticky_count, sticky_count(n));
 	}
-	
+
 	clients_count = SAFE_SUB(clients_count, clients_count_in(n));
-	
+
 	if (is_descendant(grabbed_node, n)) {
 		grabbed_node = NULL;
 	}
-	
+
 	free_node(n);
 
 	if (single_monocle && d->layout != LAYOUT_MONOCLE && tiled_count(d->root, true) <= 1) {
@@ -1658,29 +1664,29 @@ static void free_node_bounded(node_t *n, int depth)
 	if (!n || depth > MAX_TREE_DEPTH) {
 		return;
 	}
-	
+
 	node_t *first_child = n->first_child;
 	node_t *second_child = n->second_child;
-	
+
 	n->first_child = NULL;
 	n->second_child = NULL;
 	n->parent = NULL;
-	
+
 	if (n->client) {
 		secure_memzero(n->client, sizeof(client_t));
 		free(n->client);
 		n->client = NULL;
 	}
-	
+
 	if (n->presel) {
 		secure_memzero(n->presel, sizeof(presel_t));
 		free(n->presel);
 		n->presel = NULL;
 	}
-	
+
 	secure_memzero(n, sizeof(node_t));
 	free(n);
-	
+
 	free_node_bounded(first_child, depth + 1);
 	free_node_bounded(second_child, depth + 1);
 }
@@ -1703,7 +1709,7 @@ bool swap_nodes(monitor_t *m1, desktop_t *d1, node_t *n1, monitor_t *m2, desktop
 	if (d1 != d2) {
 		unsigned int n1_sticky = sticky_count(n1);
 		unsigned int n2_sticky = sticky_count(n2);
-		
+
 		if ((m1->sticky_count > 0 && n1_sticky > 0) ||
 		    (m2->sticky_count > 0 && n2_sticky > 0)) {
 			return false;
@@ -1714,12 +1720,12 @@ bool swap_nodes(monitor_t *m1, desktop_t *d1, node_t *n1, monitor_t *m2, desktop
 		return false;
 	}
 
-	put_status(SBSC_MASK_NODE_SWAP, "node_swap 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X\n", 
+	put_status(SBSC_MASK_NODE_SWAP, "node_swap 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X\n",
 	           m1->id, d1->id, n1->id, m2->id, d2->id, n2->id);
 
 	node_t *pn1 = n1->parent;
 	node_t *pn2 = n2->parent;
-	
+
 	if (pn1 == n2 || pn2 == n1) {
 		return false;
 	}
@@ -1728,7 +1734,7 @@ bool swap_nodes(monitor_t *m1, desktop_t *d1, node_t *n1, monitor_t *m2, desktop
 	bool n2_first_child = is_first_child(n2);
 	bool n1_held_focus = is_descendant(d1->focus, n1);
 	bool n2_held_focus = is_descendant(d2->focus, n2);
-	
+
 	node_t *last_d1_focus = d1->focus;
 	node_t *last_d2_focus = d2->focus;
 	uint32_t last_d1_focus_id = last_d1_focus ? last_d1_focus->id : 0;
@@ -1828,10 +1834,10 @@ bool swap_nodes(monitor_t *m1, desktop_t *d1, node_t *n1, monitor_t *m2, desktop
 		if (single_monocle) {
 			int d1_tiled = tiled_count(d1->root, true);
 			int d2_tiled = tiled_count(d2->root, true);
-			
+
 			layout_t l1 = (d1_tiled <= 1) ? LAYOUT_MONOCLE : d1->user_layout;
 			layout_t l2 = (d2_tiled <= 1) ? LAYOUT_MONOCLE : d2->user_layout;
-			
+
 			set_layout(m1, d1, l1, false);
 			set_layout(m2, d2, l2, false);
 		}
@@ -1883,15 +1889,15 @@ bool swap_nodes(monitor_t *m1, desktop_t *d1, node_t *n1, monitor_t *m2, desktop
 	}
 
 	arrange(m1, d1);
-	
+
 	if (d1 != d2) {
 		arrange(m2, d2);
 	} else {
 		if (pointer_follows_focus && (n1_held_focus || n2_held_focus)) {
 			if (d1->focus) {
 				xcb_rectangle_t rect = get_rectangle(m1, d1, d1->focus);
-				if (rect.width > 0 && rect.height > 0 && 
-				    rect.x < m1->rectangle.width && 
+				if (rect.width > 0 && rect.height > 0 &&
+				    rect.x < m1->rectangle.width &&
 				    rect.y < m1->rectangle.height) {
 					center_pointer(rect);
 				}
@@ -1917,7 +1923,7 @@ bool transfer_node(monitor_t *ms, desktop_t *ds, node_t *ns, monitor_t *md, desk
 		return false;
 	}
 
-	put_status(SBSC_MASK_NODE_TRANSFER, "node_transfer 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X\n", 
+	put_status(SBSC_MASK_NODE_TRANSFER, "node_transfer 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X 0x%08X\n",
 	           ms->id, ds->id, ns->id, md->id, dd->id, nd ? nd->id : 0);
 
 	bool held_focus = is_descendant(ds->focus, ns);
@@ -1931,14 +1937,14 @@ bool transfer_node(monitor_t *ms, desktop_t *ds, node_t *ns, monitor_t *md, desk
 	}
 
 	unlink_node(ms, ds, ns);
-	
+
 	if (last_ds_focus && last_focus_id != 0) {
 		coordinates_t loc;
 		if (!find_by_id(last_focus_id, &loc) || loc.node != last_ds_focus) {
 			last_ds_focus = NULL;
 		}
 	}
-	
+
 	insert_node(md, dd, ns, nd);
 
 	if (md != ms) {
@@ -2044,7 +2050,7 @@ bool find_closest_node(coordinates_t *ref, coordinates_t *dst, cycle_dir_t dir, 
 			break; \
 		} \
 	}
-	
+
 	HANDLE_BOUNDARIES(m, d, n);
 
 	while (n != ref->node) {
@@ -2068,20 +2074,20 @@ void circulate_leaves(monitor_t *m, desktop_t *d, node_t *n, circulate_dir_t dir
 	if (!m || !d || !n || tiled_count(n, false) < 2) {
 		return;
 	}
-	
+
 	if (!d->focus || !d->focus->parent) {
 		return;
 	}
 
 	node_t *p = d->focus->parent;
 	bool focus_first_child = is_first_child(d->focus);
-	
+
 	if (dir == CIRCULATE_FORWARD) {
 		node_t *e = second_extrema(n);
 		while (e && (!e->client || !IS_TILED(e->client))) {
 			e = prev_leaf(e, n);
 		}
-		for (node_t *s = e, *f = prev_tiled_leaf(s, n); f; 
+		for (node_t *s = e, *f = prev_tiled_leaf(s, n); f;
 		     s = prev_tiled_leaf(f, n), f = prev_tiled_leaf(s, n)) {
 			swap_nodes(m, d, f, m, d, s, false);
 		}
@@ -2090,12 +2096,12 @@ void circulate_leaves(monitor_t *m, desktop_t *d, node_t *n, circulate_dir_t dir
 		while (e && (!e->client || !IS_TILED(e->client))) {
 			e = next_leaf(e, n);
 		}
-		for (node_t *f = e, *s = next_tiled_leaf(f, n); s; 
+		for (node_t *f = e, *s = next_tiled_leaf(f, n); s;
 		     f = next_tiled_leaf(s, n), s = next_tiled_leaf(f, n)) {
 			swap_nodes(m, d, f, m, d, s, false);
 		}
 	}
-	
+
 	if (p) {
 		node_t *f = focus_first_child ? p->first_child : p->second_child;
 		if (is_leaf(f)) {
@@ -2189,7 +2195,7 @@ bool set_layer(monitor_t *m, desktop_t *d, node_t *n, stack_layer_t l)
 	ewmh_wm_state_update(n);
 
 	if (m && d) {
-		put_status(SBSC_MASK_NODE_LAYER, "node_layer 0x%08X 0x%08X 0x%08X %s\n", 
+		put_status(SBSC_MASK_NODE_LAYER, "node_layer 0x%08X 0x%08X 0x%08X %s\n",
 		           m->id, d->id, n->id, LAYER_STR(l));
 	}
 
@@ -2229,7 +2235,7 @@ bool set_state(monitor_t *m, desktop_t *d, node_t *n, client_state_t s)
 	}
 
 	if (m && d) {
-		put_status(SBSC_MASK_NODE_STATE, "node_state 0x%08X 0x%08X 0x%08X %s off\n", 
+		put_status(SBSC_MASK_NODE_STATE, "node_state 0x%08X 0x%08X 0x%08X %s off\n",
 		           m->id, d->id, n->id, STATE_STR(c->last_state));
 	}
 
@@ -2246,7 +2252,7 @@ bool set_state(monitor_t *m, desktop_t *d, node_t *n, client_state_t s)
 	}
 
 	if (m && d) {
-		put_status(SBSC_MASK_NODE_STATE, "node_state 0x%08X 0x%08X 0x%08X %s on\n", 
+		put_status(SBSC_MASK_NODE_STATE, "node_state 0x%08X 0x%08X 0x%08X %s on\n",
 		           m->id, d->id, n->id, STATE_STR(c->state));
 	}
 
@@ -2374,21 +2380,21 @@ void update_constraints(node_t *n)
 	if (!n || is_leaf(n) || !n->first_child || !n->second_child) {
 		return;
 	}
-	
+
 	if (n->split_type == TYPE_VERTICAL) {
 		uint16_t min_w1 = n->first_child->constraints.min_width;
 		uint16_t min_w2 = n->second_child->constraints.min_width;
-		
+
 		n->constraints.min_width = SAFE_ADD(min_w1, min_w2, UINT16_MAX);
-		n->constraints.min_height = MAX(n->first_child->constraints.min_height, 
+		n->constraints.min_height = MAX(n->first_child->constraints.min_height,
 		                               n->second_child->constraints.min_height);
 	} else {
-		n->constraints.min_width = MAX(n->first_child->constraints.min_width, 
+		n->constraints.min_width = MAX(n->first_child->constraints.min_width,
 		                              n->second_child->constraints.min_width);
-		
+
 		uint16_t min_h1 = n->first_child->constraints.min_height;
 		uint16_t min_h2 = n->second_child->constraints.min_height;
-		
+
 		n->constraints.min_height = SAFE_ADD(min_h1, min_h2, UINT16_MAX);
 	}
 }
@@ -2427,7 +2433,7 @@ void set_hidden(monitor_t *m, desktop_t *d, node_t *n, bool value)
 	propagate_hidden_upward(m, d, n);
 
 	if (m && d) {
-		put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X hidden %s\n", 
+		put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X hidden %s\n",
 		           m->id, d->id, n->id, ON_OFF_STR(value));
 	}
 
@@ -2542,7 +2548,7 @@ void set_sticky(monitor_t *m, desktop_t *d, node_t *n, bool value)
 		ewmh_wm_state_update(n);
 	}
 
-	put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X sticky %s\n", 
+	put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X sticky %s\n",
 	           m->id, d->id, n->id, ON_OFF_STR(value));
 
 	if (n == m->desk->focus) {
@@ -2559,7 +2565,7 @@ void set_private(monitor_t *m, desktop_t *d, node_t *n, bool value)
 	n->private = value;
 
 	if (m && d) {
-		put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X private %s\n", 
+		put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X private %s\n",
 		           m->id, d->id, n->id, ON_OFF_STR(value));
 	}
 
@@ -2577,7 +2583,7 @@ void set_locked(monitor_t *m, desktop_t *d, node_t *n, bool value)
 	n->locked = value;
 
 	if (m && d) {
-		put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X locked %s\n", 
+		put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X locked %s\n",
 		           m->id, d->id, n->id, ON_OFF_STR(value));
 	}
 
@@ -2595,7 +2601,7 @@ void set_marked(monitor_t *m, desktop_t *d, node_t *n, bool value)
 	n->marked = value;
 
 	if (m && d) {
-		put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X marked %s\n", 
+		put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X marked %s\n",
 		           m->id, d->id, n->id, ON_OFF_STR(value));
 	}
 
@@ -2625,10 +2631,10 @@ void set_urgent(monitor_t *m, desktop_t *d, node_t *n, bool value)
 	ewmh_wm_state_update(n);
 
 	if (m && d) {
-		put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X urgent %s\n", 
+		put_status(SBSC_MASK_NODE_FLAG, "node_flag 0x%08X 0x%08X 0x%08X urgent %s\n",
 		           m->id, d->id, n->id, ON_OFF_STR(value));
 	}
-	
+
 	put_status(SBSC_MASK_REPORT);
 }
 
@@ -2637,7 +2643,7 @@ xcb_rectangle_t get_rectangle(monitor_t *m, desktop_t *d, node_t *n)
 	if (!n) {
 		return m ? m->rectangle : (xcb_rectangle_t){0, 0, 0, 0};
 	}
-	
+
 	client_t *c = n->client;
 	if (c) {
 		if (IS_FLOATING(c)) {
