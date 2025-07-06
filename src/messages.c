@@ -42,6 +42,7 @@
 #include "common.h"
 #include "parse.h"
 #include "messages.h"
+#include "animation.h"
 
 void handle_message(char *msg, int msg_len, FILE *rsp)
 {
@@ -1837,6 +1838,22 @@ void set_setting(coordinates_t loc, char *name, char *value, FILE *rsp)
 		SET_BOOL(center_pseudo_tiled)
 		SET_BOOL(removal_adjustment)
 #undef SET_BOOL
+	} else if (streq("animation_enabled", name)) {
+		bool b;
+		if (parse_bool(value, &b)) {
+			animation_set_enabled(b);
+		} else {
+			fail(rsp, "config: %s: Invalid value: '%s'.\n", name, value);
+			return;
+		}
+	} else if (streq("animation_duration", name)) {
+		uint64_t ms;
+		if (sscanf(value, "%lu", &ms) == 1) {
+			animation_set_duration(ms);
+		} else {
+			fail(rsp, "config: %s: Invalid value: '%s'.\n", name, value);
+			return;
+		}
 #define SET_MON_BOOL(s) \
 	} else if (streq(#s, name)) { \
 		if (!parse_bool(value, &s)) { \
@@ -1972,6 +1989,10 @@ void get_setting(coordinates_t loc, char *name, FILE* rsp)
 	GET_BOOL(remove_unplugged_monitors)
 	GET_BOOL(merge_overlapping_monitors)
 #undef GET_BOOL
+	} else if (streq("animation_enabled", name)) {
+		fprintf(rsp, "%s", BOOL_STR(animation_enabled));
+	} else if (streq("animation_duration", name)) {
+		fprintf(rsp, "%lu", animation_duration);
 	} else {
 		fail(rsp, "config: Unknown setting: '%s'.\n", name);
 		return;

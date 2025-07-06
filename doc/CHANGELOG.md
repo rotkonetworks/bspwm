@@ -1,3 +1,36 @@
+# v0.10.6
+
+### New Features
+- Add animation system for smooth window transitions (disabled by default)
+  - 25ms ultra-fast animations for snappy feel when enabled
+  - Configurable via `bspc config animations true/false`
+  - Adjustable duration via `bspc config animation_duration <ms>`
+  - Smooth cubic easing for tiled windows, elastic easing for floating
+  - Automatic animation cancellation during active window dragging
+  - Memory-safe implementation with bounds checking and overflow protection
+
+### Implementation Details
+- **Animation subsystem** (`animation.c`, `animation.h`)
+  - Maximum 64 concurrent animations with automatic cleanup
+  - High-resolution timing with microsecond precision
+  - Safe interpolation for window coordinates
+  - Automatic completion of animations on disable
+- **Integration points**
+  - Window tiling operations in `apply_layout()`
+  - Floating window move/resize operations
+  - Graceful cleanup on window removal
+  - Event loop integration for smooth updates
+
+### Configuration
+- `animation_enabled` - Enable/disable animations (default: false)
+- `animation_duration` - Animation duration in milliseconds (default: 25)
+
+### Technical Improvements
+- Add `secure_memzero()` to prevent sensitive data leaks
+- Safe arithmetic operations with overflow protection
+- Proper memory cleanup order to prevent use-after-free
+- Defensive programming with extensive null checks and bounds validation
+
 # 0.10.5
 
 ### Security Fixes

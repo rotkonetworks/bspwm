@@ -65,13 +65,15 @@ bool swallow_first_click;
 bool ignore_ewmh_focus;
 bool ignore_ewmh_struts;
 state_transition_t ignore_ewmh_fullscreen;
-
 bool center_pseudo_tiled;
 honor_size_hints_mode_t honor_size_hints;
-
 bool remove_disabled_monitors;
 bool remove_unplugged_monitors;
 bool merge_overlapping_monitors;
+
+// Animation settings
+bool animation_enabled;
+uint64_t animation_duration;
 
 void run_config(int run_level)
 {
@@ -128,11 +130,13 @@ void load_settings(void)
 	ignore_ewmh_focus = IGNORE_EWMH_FOCUS;
 	ignore_ewmh_fullscreen = IGNORE_EWMH_FULLSCREEN;
 	ignore_ewmh_struts = IGNORE_EWMH_STRUTS;
-
 	center_pseudo_tiled = CENTER_PSEUDO_TILED;
 	honor_size_hints = HONOR_SIZE_HINTS;
-
 	remove_disabled_monitors = REMOVE_DISABLED_MONITORS;
 	remove_unplugged_monitors = REMOVE_UNPLUGGED_MONITORS;
 	merge_overlapping_monitors = MERGE_OVERLAPPING_MONITORS;
+
+	// animation defaults - 25ms for snappy feel
+	animation_enabled = false;  // sefault OFF as discussed
+	animation_duration = 25;    // 25ms when enabled
 }
