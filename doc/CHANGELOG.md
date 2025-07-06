@@ -1,4 +1,4 @@
-# v0.10.6
+# v0.10.6 / v0.10.7
 
 ### New Features
 - Add animation system for smooth window transitions (disabled by default)
@@ -55,7 +55,7 @@
 
 ### Security Fixes
 - Fix buffer overflow in `handle_message()` by adding bounds check for j index
-- Fix memory leak in `cmd_rule()` by freeing rule object on tokenization failure  
+- Fix memory leak in `cmd_rule()` by freeing rule object on tokenization failure
 - Fix buffer overflow in `cmd_rule()` effect string construction
 - Fix memory leaks in `cmd_query()` by freeing selectors on all error paths
 - Fix format string vulnerability by using `"%s"` format specifier for empty strings
